@@ -1,0 +1,2 @@
+# SpectreSecurityMN
+Spectre Security Masternode
