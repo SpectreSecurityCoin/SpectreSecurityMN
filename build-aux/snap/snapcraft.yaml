@@ -106,7 +106,7 @@ parts:
       - fcitx-frontend-qt5
 
   spectresecurity-core:
-    source: https://github.com/${projectName^}/${projectName}
+    source: https://github.com/Spectresecurity/spectresecurity
     source-type: git
     source-tag: master
     plugin: nil

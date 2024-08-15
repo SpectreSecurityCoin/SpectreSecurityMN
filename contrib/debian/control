@@ -29,8 +29,8 @@ Build-Depends: debhelper,
  dh-systemd
 Standards-Version: 3.9.2
 Homepage: http://www.spectresecurity.org
-Vcs-Git: git://github.com/${projectName^}/${projectName}.git
-Vcs-Browser: http://github.com/${projectName^}/${projectName}
+Vcs-Git: git://github.com/Spectresecurity/spectresecurity.git
+Vcs-Browser: http://github.com/Spectresecurity/spectresecurity
 
 Package: spectresecurityd
 Architecture: any
