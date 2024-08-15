@@ -1,0 +1,15 @@
+# http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-1.0.html
+
+[Desktop Entry]
+Encoding=UTF-8
+Name=SPECTRESECURITY Core Daemon SNAP
+Comment=main
+GenericName=SPECTRESECURITY Digital Currency Daemon Client main network
+Exec=spectresecurity-core.daemon %u
+Terminal=true
+Type=Application
+Icon=${SNAP}/share/pixmaps/spectresecurity.png
+MimeType=x-scheme-handler/ssmn;
+Categories=X-Office;X-Finance;
+Keywords=internet;spectresecurity;zssmn;core;wallet;daemon;main;snap;launchpad;crypto;digital;currency;coin;token;zerocoin;
+Version=1.0

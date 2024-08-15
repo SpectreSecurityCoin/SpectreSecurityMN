@@ -1,0 +1,15 @@
+QT_TS = \
+  qt/locale/spectresecurity_de.ts \
+  qt/locale/spectresecurity_en.ts \
+  qt/locale/spectresecurity_en_US.ts \
+  qt/locale/spectresecurity_es.ts \
+  qt/locale/spectresecurity_es_ES.ts \
+  qt/locale/spectresecurity_fr_FR.ts \
+  qt/locale/spectresecurity_hr_HR.ts \
+  qt/locale/spectresecurity_it.ts \
+  qt/locale/spectresecurity_ko_KR.ts \
+  qt/locale/spectresecurity_nl.ts \
+  qt/locale/spectresecurity_pl.ts \
+  qt/locale/spectresecurity_ru.ts \
+  qt/locale/spectresecurity_tr.ts \
+  qt/locale/spectresecurity_zh_CN.ts

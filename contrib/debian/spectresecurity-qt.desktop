@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=SPECTRESECURITY Core
+Comment=SPECTRESECURITY P2P Cryptocurrency
+Comment[fr]=SPECTRESECURITY, monnaie virtuelle cryptographique pair à pair
+Comment[tr]=SPECTRESECURITY, eşten eşe kriptografik sanal para birimi
+Exec=spectresecurity-qt %u
+Terminal=false
+Type=Application
+Icon=spectresecurity128
+MimeType=x-scheme-handler/spectresecurity;
+Categories=Office;Finance;
+StartupWMClass=Spectresecurity-qt

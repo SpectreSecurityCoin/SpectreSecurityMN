@@ -1,0 +1,3 @@
+usr/local/bin/spectresecurityd usr/bin
+usr/local/bin/spectresecurity-cli usr/bin
+debian/examples/spectresecurity.conf etc/spectresecurity

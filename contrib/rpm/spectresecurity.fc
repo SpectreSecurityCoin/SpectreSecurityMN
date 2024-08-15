@@ -1,0 +1,8 @@
+/usr/bin/spectresecurity-cli		--	gen_context(system_u:object_r:spectresecurity_exec_t,s0)
+/usr/sbin/spectresecurityd		--	gen_context(system_u:object_r:spectresecurity_exec_t,s0)
+/usr/lib(64)?/spectresecurity/spectresecurityd		--	gen_context(system_u:object_r:spectresecurity_exec_t,s0)
+
+/etc/spectresecurity(/.*)?		gen_context(system_u:object_r:spectresecurity_conf_t,s0)
+/var/lib/spectresecurity(/.*)?		gen_context(system_u:object_r:spectresecurity_var_lib_t,s0)
+
+(/var)?/run/spectresecurityd(/.*)?   gen_context(system_u:object_r:spectresecurity_var_run_t,s0)

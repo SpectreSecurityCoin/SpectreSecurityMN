@@ -1,0 +1,6 @@
+usr/local/bin/spectresecurity-qt usr/bin
+share/pixmaps/spectresecurity32.xpm usr/share/pixmaps
+share/pixmaps/spectresecurity16.xpm usr/share/pixmaps
+share/pixmaps/spectresecurity128.png usr/share/pixmaps
+debian/spectresecurity-qt.desktop usr/share/applications
+debian/spectresecurity-qt.protocol usr/share/kde4/services/
