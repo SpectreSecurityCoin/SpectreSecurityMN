@@ -1,0 +1,727 @@
+# Copyright (c) 2013-2016 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+bin_PROGRAMS += qt/spectresecurity-qt
+EXTRA_LIBRARIES += qt/libbitcoinqt.a
+
+# spectresecurity qt core #
+include Makefile.qt_locale.include
+
+QT_FORMS_UI = \
+  qt/forms/addressbookpage.ui \
+  qt/forms/askpassphrasedialog.ui \
+  qt/forms/coincontroldialog.ui \
+  qt/forms/editaddressdialog.ui \
+  qt/forms/helpmessagedialog.ui \
+  qt/forms/intro.ui \
+  qt/forms/openuridialog.ui \
+  qt/forms/optionsdialog.ui \
+  qt/forms/rpcconsole.ui \
+  qt/spectresecurity/forms/loadingdialog.ui \
+  qt/spectresecurity/forms/snackbar.ui \
+  qt/spectresecurity/forms/navmenuwidget.ui \
+  qt/spectresecurity/forms/lockunlock.ui \
+  qt/spectresecurity/forms/expandablebutton.ui \
+  qt/spectresecurity/forms/receivedialog.ui \
+  qt/spectresecurity/forms/balancebubble.ui \
+  qt/spectresecurity/forms/topbar.ui \
+  qt/spectresecurity/forms/txrow.ui \
+  qt/spectresecurity/forms/dashboardwidget.ui \
+  qt/spectresecurity/forms/addresslabelrow.ui \
+  qt/spectresecurity/forms/contactdropdownrow.ui \
+  qt/spectresecurity/forms/mninfodialog.ui \
+  qt/spectresecurity/forms/optionbutton.ui \
+  qt/spectresecurity/forms/masternodewizarddialog.ui \
+  qt/spectresecurity/forms/mnrow.ui \
+  qt/spectresecurity/forms/masternodeswidget.ui \
+  qt/spectresecurity/forms/myaddressrow.ui \
+  qt/spectresecurity/forms/csrow.ui \
+  qt/spectresecurity/forms/sendmemodialog.ui \
+  qt/spectresecurity/forms/sendchangeaddressdialog.ui \
+  qt/spectresecurity/forms/sendconfirmdialog.ui \
+  qt/spectresecurity/forms/sendcustomfeedialog.ui \
+  qt/spectresecurity/forms/sendmultirow.ui \
+  qt/spectresecurity/forms/send.ui \
+  qt/spectresecurity/forms/addnewaddressdialog.ui \
+  qt/spectresecurity/forms/addnewcontactdialog.ui \
+  qt/spectresecurity/forms/requestdialog.ui \
+  qt/spectresecurity/forms/receivewidget.ui \
+  qt/spectresecurity/forms/tooltipmenu.ui \
+  qt/spectresecurity/forms/addresseswidget.ui \
+  qt/spectresecurity/forms/defaultdialog.ui \
+  qt/spectresecurity/forms/coldstakingwidget.ui \
+  qt/spectresecurity/settings/forms/settingsbackupwallet.ui \
+  qt/spectresecurity/settings/forms/settingsexportcsv.ui \
+  qt/spectresecurity/settings/forms/settingsbittoolwidget.ui \
+  qt/spectresecurity/settings/forms/settingsconsolewidget.ui \
+  qt/spectresecurity/settings/forms/settingsdisplayoptionswidget.ui \
+  qt/spectresecurity/settings/forms/settingsfaqwidget.ui \
+  qt/spectresecurity/settings/forms/settingsinformationwidget.ui \
+  qt/spectresecurity/settings/forms/settingsmainoptionswidget.ui \
+  qt/spectresecurity/settings/forms/settingsmultisenddialog.ui \
+  qt/spectresecurity/settings/forms/settingsmultisendwidget.ui \
+  qt/spectresecurity/settings/forms/settingssignmessagewidgets.ui \
+  qt/spectresecurity/settings/forms/settingswalletoptionswidget.ui \
+  qt/spectresecurity/settings/forms/settingswalletrepairwidget.ui \
+  qt/spectresecurity/settings/forms/settingswidget.ui \
+  qt/spectresecurity/forms/welcomecontentwidget.ui \
+  qt/spectresecurity/forms/splash.ui
+
+QT_MOC_CPP = \
+  qt/moc_addressbookpage.cpp \
+  qt/moc_addresstablemodel.cpp \
+  qt/moc_askpassphrasedialog.cpp \
+  qt/moc_bantablemodel.cpp \
+  qt/moc_bitcoinaddressvalidator.cpp \
+  qt/spectresecurity/moc_spectresecuritygui.cpp \
+  qt/moc_bitcoinunits.cpp \
+  qt/moc_clientmodel.cpp \
+  qt/moc_coincontroldialog.cpp \
+  qt/moc_coincontroltreewidget.cpp \
+  qt/moc_csvmodelwriter.cpp \
+  qt/moc_editaddressdialog.cpp \
+  qt/moc_guiutil.cpp \
+  qt/moc_intro.cpp \
+  qt/moc_macdockiconhandler.cpp \
+  qt/moc_macnotificationhandler.cpp \
+  qt/moc_notificator.cpp \
+  qt/moc_openuridialog.cpp \
+  qt/moc_optionsdialog.cpp \
+  qt/moc_optionsmodel.cpp \
+  qt/moc_peertablemodel.cpp \
+  qt/moc_paymentserver.cpp \
+  qt/moc_qvalidatedlineedit.cpp \
+  qt/moc_qvaluecombobox.cpp \
+  qt/moc_recentrequeststablemodel.cpp \
+  qt/moc_rpcconsole.cpp \
+  qt/moc_trafficgraphwidget.cpp \
+  qt/moc_transactionfilterproxy.cpp \
+  qt/moc_transactiontablemodel.cpp \
+  qt/moc_utilitydialog.cpp \
+  qt/moc_walletmodel.cpp \
+  qt/spectresecurity/moc_loadingdialog.cpp \
+  qt/spectresecurity/moc_pwidget.cpp \
+  qt/spectresecurity/moc_focuseddialog.cpp \
+  qt/spectresecurity/moc_snackbar.cpp \
+  qt/spectresecurity/moc_navmenuwidget.cpp \
+  qt/spectresecurity/moc_lockunlock.cpp \
+  qt/spectresecurity/moc_expandablebutton.cpp \
+  qt/spectresecurity/moc_furabstractlistitemdelegate.cpp \
+  qt/spectresecurity/moc_receivedialog.cpp \
+  qt/spectresecurity/moc_pfborderimage.cpp \
+  qt/spectresecurity/moc_topbar.cpp \
+  qt/spectresecurity/moc_txrow.cpp \
+  qt/spectresecurity/moc_dashboardwidget.cpp \
+  qt/spectresecurity/moc_addresslabelrow.cpp \
+  qt/spectresecurity/moc_contactdropdownrow.cpp \
+  qt/spectresecurity/moc_mninfodialog.cpp \
+  qt/spectresecurity/moc_optionbutton.cpp \
+  qt/spectresecurity/moc_coldstakingmodel.cpp \
+  qt/spectresecurity/moc_mnmodel.cpp \
+  qt/spectresecurity/moc_masternodewizarddialog.cpp \
+  qt/spectresecurity/moc_mnrow.cpp \
+  qt/spectresecurity/moc_masternodeswidget.cpp \
+  qt/spectresecurity/moc_myaddressrow.cpp \
+  qt/spectresecurity/moc_csrow.cpp \
+  qt/spectresecurity/moc_contactsdropdown.cpp \
+  qt/spectresecurity/moc_sendchangeaddressdialog.cpp \
+  qt/spectresecurity/moc_sendconfirmdialog.cpp \
+  qt/spectresecurity/moc_sendcustomfeedialog.cpp \
+  qt/spectresecurity/moc_sendmemodialog.cpp \
+  qt/spectresecurity/moc_sendmultirow.cpp \
+  qt/spectresecurity/moc_send.cpp \
+  qt/spectresecurity/moc_addnewaddressdialog.cpp \
+  qt/spectresecurity/moc_addnewcontactdialog.cpp \
+  qt/spectresecurity/moc_requestdialog.cpp \
+  qt/spectresecurity/moc_receivewidget.cpp \
+  qt/spectresecurity/moc_tooltipmenu.cpp \
+  qt/spectresecurity/moc_addresseswidget.cpp \
+  qt/spectresecurity/moc_defaultdialog.cpp \
+  qt/spectresecurity/moc_coldstakingwidget.cpp \
+  qt/spectresecurity/settings/moc_settingsbackupwallet.cpp \
+  qt/spectresecurity/settings/moc_settingsexportcsv.cpp \
+  qt/spectresecurity/settings/moc_settingsbittoolwidget.cpp \
+  qt/spectresecurity/settings/moc_settingsconsolewidget.cpp \
+  qt/spectresecurity/settings/moc_settingsdisplayoptionswidget.cpp \
+  qt/spectresecurity/settings/moc_settingsfaqwidget.cpp \
+  qt/spectresecurity/settings/moc_settingsinformationwidget.cpp \
+  qt/spectresecurity/settings/moc_settingsmainoptionswidget.cpp \
+  qt/spectresecurity/settings/moc_settingsmultisenddialog.cpp \
+  qt/spectresecurity/settings/moc_settingsmultisendwidget.cpp \
+  qt/spectresecurity/settings/moc_settingssignmessagewidgets.cpp \
+  qt/spectresecurity/settings/moc_settingswalletoptionswidget.cpp \
+  qt/spectresecurity/settings/moc_settingswalletrepairwidget.cpp \
+  qt/spectresecurity/settings/moc_settingswidget.cpp \
+  qt/spectresecurity/moc_welcomecontentwidget.cpp \
+  qt/spectresecurity/moc_splash.cpp
+
+BITCOIN_MM = \
+  qt/macdockiconhandler.mm \
+  qt/macnotificationhandler.mm
+
+QT_MOC = \
+  qt/spectresecurity.moc \
+  qt/intro.moc \
+  qt/rpcconsole.moc \
+  qt/spectresecurity/settings/moc_settingsconsolewidget.cpp
+
+QT_QRC_CPP = qt/qrc_spectresecurity.cpp
+QT_QRC = qt/spectresecurity.qrc
+QT_QRC_LOCALE_CPP = qt/qrc_spectresecurity_locale.cpp
+QT_QRC_LOCALE = qt/spectresecurity_locale.qrc
+
+PROTOBUF_CC = qt/paymentrequest.pb.cc
+PROTOBUF_H = qt/paymentrequest.pb.h
+PROTOBUF_PROTO = qt/paymentrequest.proto
+
+BITCOIN_QT_H = \
+  qt/addressbookpage.h \
+  qt/addresstablemodel.h \
+  qt/askpassphrasedialog.h \
+  qt/bantablemodel.h \
+  qt/bitcoinaddressvalidator.h \
+  qt/spectresecurity/spectresecuritygui.h \
+  qt/bitcoinunits.h \
+  qt/clientmodel.h \
+  qt/coincontroldialog.h \
+  qt/coincontroltreewidget.h \
+  qt/csvmodelwriter.h \
+  qt/editaddressdialog.h \
+  qt/guiconstants.h \
+  qt/guiutil.h \
+  qt/intro.h \
+  qt/macdockiconhandler.h \
+  qt/macnotificationhandler.h \
+  qt/networkstyle.h \
+  qt/notificator.h \
+  qt/openuridialog.h \
+  qt/optionsdialog.h \
+  qt/optionsmodel.h \
+  qt/paymentrequestplus.h \
+  qt/paymentserver.h \
+  qt/peertablemodel.h \
+  qt/platformstyle.h \
+  qt/qvalidatedlineedit.h \
+  qt/qvaluecombobox.h \
+  qt/recentrequeststablemodel.h \
+  qt/rpcconsole.h \
+  qt/trafficgraphwidget.h \
+  qt/transactionfilterproxy.h \
+  qt/transactionrecord.h \
+  qt/transactiontablemodel.h \
+  qt/utilitydialog.h \
+  qt/walletmodel.h \
+  qt/walletmodeltransaction.h \
+  qt/spectresecurity/prunnable.h \
+  qt/spectresecurity/pfborderimage.h \
+  qt/spectresecurity/loadingdialog.h \
+  qt/winshutdownmonitor.h \
+  qt/spectresecurity/pwidget.h \
+  qt/spectresecurity/focuseddialog.h \
+  qt/spectresecurity/guitransactionsutils.h \
+  qt/spectresecurity/snackbar.h \
+  qt/spectresecurity/navmenuwidget.h \
+  qt/spectresecurity/lockunlock.h \
+  qt/spectresecurity/receivedialog.h \
+  qt/spectresecurity/furlistrow.h \
+  qt/spectresecurity/furabstractlistitemdelegate.h \
+  qt/spectresecurity/txviewholder.h \
+  qt/spectresecurity/qtutils.h \
+  qt/spectresecurity/expandablebutton.h \
+  qt/spectresecurity/balancebubble.h \
+  qt/spectresecurity/topbar.h \
+  qt/spectresecurity/txrow.h \
+  qt/spectresecurity/addressholder.h \
+  qt/spectresecurity/addressfilterproxymodel.h \
+  qt/spectresecurity/dashboardwidget.h \
+  qt/spectresecurity/addresslabelrow.h \
+  qt/spectresecurity/contactdropdownrow.h \
+  qt/spectresecurity/mninfodialog.h \
+  qt/spectresecurity/optionbutton.h \
+  qt/spectresecurity/coldstakingmodel.h \
+  qt/spectresecurity/mnmodel.h \
+  qt/spectresecurity/masternodewizarddialog.h \
+  qt/spectresecurity/mnrow.h \
+  qt/spectresecurity/masternodeswidget.h \
+  qt/spectresecurity/myaddressrow.h \
+  qt/spectresecurity/csrow.h \
+  qt/spectresecurity/contactsdropdown.h \
+  qt/spectresecurity/sendchangeaddressdialog.h \
+  qt/spectresecurity/sendconfirmdialog.h \
+  qt/spectresecurity/sendcustomfeedialog.h \
+  qt/spectresecurity/sendmemodialog.h \
+  qt/spectresecurity/sendmultirow.h \
+  qt/spectresecurity/send.h \
+  qt/spectresecurity/addnewaddressdialog.h \
+  qt/spectresecurity/addnewcontactdialog.h \
+  qt/spectresecurity/requestdialog.h \
+  qt/spectresecurity/receivewidget.h \
+  qt/spectresecurity/tooltipmenu.h \
+  qt/spectresecurity/addresseswidget.h \
+  qt/spectresecurity/defaultdialog.h \
+  qt/spectresecurity/coldstakingwidget.h \
+  qt/spectresecurity/settings/settingsbackupwallet.h \
+  qt/spectresecurity/settings/settingsexportcsv.h \
+  qt/spectresecurity/settings/settingsbittoolwidget.h \
+  qt/spectresecurity/settings/settingsconsolewidget.h \
+  qt/spectresecurity/settings/settingsdisplayoptionswidget.h \
+  qt/spectresecurity/settings/settingsfaqwidget.h \
+  qt/spectresecurity/settings/settingsinformationwidget.h \
+  qt/spectresecurity/settings/settingsmainoptionswidget.h \
+  qt/spectresecurity/settings/settingsmultisenddialog.h \
+  qt/spectresecurity/settings/settingsmultisendwidget.h \
+  qt/spectresecurity/settings/settingssignmessagewidgets.h \
+  qt/spectresecurity/settings/settingswalletoptionswidget.h \
+  qt/spectresecurity/settings/settingswalletrepairwidget.h \
+  qt/spectresecurity/settings/settingswidget.h \
+  qt/spectresecurity/welcomecontentwidget.h \
+  qt/spectresecurity/splash.h
+
+RES_ICONS = \
+  qt/res/icons/bitcoin.ico \
+  qt/res/icons/bitcoin.png \
+  qt/res/icons/bitcoin_testnet.ico \
+  qt/res/icons/bitcoin_testnet.png \
+  qt/res/icons/bitcoin_regtest.png \
+  qt/res/icons/lock_closed.png \
+  qt/res/icons/lock_open.png \
+  qt/res/icons/overview.png \
+  qt/res/icons/ic-transaction-received.svg \
+  qt/res/icons/ic-transaction-mint.svg \
+  qt/res/icons/ic-transaction-sent.svg \
+  qt/res/icons/ic-transaction-staked.svg \
+  qt/spectresecurity/res/img/bg-dashboard-banner.png \
+  qt/spectresecurity/res/img/bg-multi-number-dark.svg \
+  qt/spectresecurity/res/img/ic-check-locked.svg \
+  qt/spectresecurity/res/img/ic-nav-address.svg \
+  qt/spectresecurity/res/img/ic-update.svg \
+  qt/spectresecurity/res/img/bg-multi-number.svg \
+  qt/spectresecurity/res/img/ic-check-mint-off.svg \
+  qt/spectresecurity/res/img/ic-nav-cold-staking.svg \
+  qt/spectresecurity/res/img/ic-nav-cold-staking-active.svg \
+  qt/spectresecurity/res/img/ic-nav-dashboard-active.svg \
+  qt/spectresecurity/res/img/ic-wallet-status-locked.svg \
+  qt/spectresecurity/res/img/bg-splash.svg \
+  qt/spectresecurity/res/img/bg-splash.png \
+  qt/spectresecurity/res/img/ic-check-mint.svg \
+  qt/spectresecurity/res/img/ic-nav-dashboard-hover.svg \
+  qt/spectresecurity/res/img/ic-wallet-status-staking.svg \
+  qt/spectresecurity/res/img/ic-check-peers-off.svg \
+  qt/spectresecurity/res/img/ic-nav-dashboard.svg \
+  qt/spectresecurity/res/img/ic-wallet-status-unlocked.svg \
+  qt/spectresecurity/res/img/ic-check-peers.svg \
+  qt/spectresecurity/res/img/ic-nav-master-active.svg \
+  qt/spectresecurity/res/img/ic-watch-password-white.svg \
+  qt/spectresecurity/res/img/bg-welcome-container.jpg \
+  qt/spectresecurity/res/img/bg-welcome-container.png \
+  qt/spectresecurity/res/img/bg-welcome-container.svg \
+  qt/spectresecurity/res/img/bg-welcome-container@2x.png \
+  qt/spectresecurity/res/img/bg-welcome-container@3x.png \
+  qt/spectresecurity/res/img/ic-check-staking-off.svg \
+  qt/spectresecurity/res/img/ic-nav-master-hover.svg \
+  qt/spectresecurity/res/img/ic-watch-password.svg \
+  qt/spectresecurity/res/img/bg-welcome.jpg \
+  qt/spectresecurity/res/img/bg-welcome.svg \
+  qt/spectresecurity/res/img/bg-welcome@2x.jpg \
+  qt/spectresecurity/res/img/bg-welcome@3x.jpg \
+  qt/spectresecurity/res/img/bg-welcome.png \
+  qt/spectresecurity/res/img/ic-check-staking.svg \
+  qt/spectresecurity/res/img/ic-nav-master.svg \
+  qt/spectresecurity/res/img/img-dashboard-banner.jpg \
+  qt/spectresecurity/res/img/btn-radio-active.svg \
+  qt/spectresecurity/res/img/ic-check-sync-off.svg \
+  qt/spectresecurity/res/img/ic-nav-privacy-active.svg \
+  qt/spectresecurity/res/img/img-empty-contacts.svg \
+  qt/spectresecurity/res/img/btn-radio-off.svg \
+  qt/spectresecurity/res/img/ic-check-sync.png \
+  qt/spectresecurity/res/img/ic-nav-privacy-hover.svg \
+  qt/spectresecurity/res/img/img-empty-dark-contacts.svg \
+  qt/spectresecurity/res/img/ic-contact-arrow-down.svg \
+  qt/spectresecurity/res/img/ic-contact-arrow-down-white.svg \
+  qt/spectresecurity/res/img/ic-check-sync.svg \
+  qt/spectresecurity/res/img/ic-check-faq.svg \
+  qt/spectresecurity/res/img/ic-nav-privacy.svg \
+  qt/spectresecurity/res/img/img-empty-dark-error.svg \
+  qt/spectresecurity/res/img/ic-add-label.svg \
+  qt/spectresecurity/res/img/ic-pending.svg \
+  qt/spectresecurity/res/img/ic-check-theme-dark.svg \
+  qt/spectresecurity/res/img/ic-nav-receive-active.svg \
+  qt/spectresecurity/res/img/img-empty-dark-masternode.svg \
+  qt/spectresecurity/res/img/ic-add-liliac.svg \
+  qt/spectresecurity/res/img/ic-check-theme-light.svg \
+  qt/spectresecurity/res/img/ic-nav-receive-hover.svg \
+  qt/spectresecurity/res/img/img-empty-dark-multisend.svg \
+  qt/spectresecurity/res/img/ic-add-purple.svg \
+  qt/spectresecurity/res/img/ic-check-white.svg \
+  qt/spectresecurity/res/img/ic-nav-receive.svg \
+  qt/spectresecurity/res/img/img-empty-dark-peers.svg \
+  qt/spectresecurity/res/img/ic-add.svg \
+  qt/spectresecurity/res/img/ic-check.svg \
+  qt/spectresecurity/res/img/ic-nav-send-active.svg \
+  qt/spectresecurity/res/img/img-empty-dark-staking-off.svg \
+  qt/spectresecurity/res/img/img-empty-dark-staking-on.svg \
+  qt/spectresecurity/res/img/ic-address-book-grey.svg \
+  qt/spectresecurity/res/img/ic-chevron-left.svg \
+  qt/spectresecurity/res/img/ic-nav-send-hover.svg \
+  qt/spectresecurity/res/img/img-empty-dark-transactions.svg \
+  qt/spectresecurity/res/img/ic-address-book-white.svg \
+  qt/spectresecurity/res/img/ic-chevron-right.svg \
+  qt/spectresecurity/res/img/ic-chevron-right-liliac.svg \
+  qt/spectresecurity/res/img/ic-nav-send.svg \
+  qt/spectresecurity/res/img/img-empty-error.svg \
+  qt/spectresecurity/res/img/ic-address-book.svg \
+  qt/spectresecurity/res/img/ic-clear-liliac.svg \
+  qt/spectresecurity/res/img/ic-nav-settings-active.svg \
+  qt/spectresecurity/res/img/img-empty-masternode.svg \
+  qt/spectresecurity/res/img/ic-address-send-white.svg \
+  qt/spectresecurity/res/img/ic-clear-purple.svg \
+  qt/spectresecurity/res/img/ic-nav-settings-hover.svg \
+  qt/spectresecurity/res/img/img-empty-multisend.svg \
+  qt/spectresecurity/res/img/ic-address-send.svg \
+  qt/spectresecurity/res/img/ic-close-white.svg \
+  qt/spectresecurity/res/img/ic-nav-settings.svg \
+  qt/spectresecurity/res/img/img-empty-peers.svg \
+  qt/spectresecurity/res/img/img-empty-privacy.svg \
+  qt/spectresecurity/res/img/img-empty-privacy-dark.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-down-white.svg \
+  qt/spectresecurity/res/img/ic-close.svg \
+  qt/spectresecurity/res/img/ic-radio-liliac-on.svg \
+  qt/spectresecurity/res/img/img-empty-staking-off.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-down.svg \
+  qt/spectresecurity/res/img/ic-coin-ssmn.svg \
+  qt/spectresecurity/res/img/ic-receive-off.svg \
+  qt/spectresecurity/res/img/img-empty-staking-on.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-up-white.svg \
+  qt/spectresecurity/res/img/ic-coin-zssmn.png \
+  qt/spectresecurity/res/img/ic-receive-on.svg \
+  qt/spectresecurity/res/img/img-empty-transactions.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-up.svg \
+  qt/spectresecurity/res/img/ic-coin-zssmn.svg \
+  qt/spectresecurity/res/img/ic-received.svg \
+  qt/spectresecurity/res/img/img-logo-spectresecurity.png \
+  qt/spectresecurity/res/img/ic-arrow-drop-white-down.svg \
+  qt/spectresecurity/res/img/ic-combo-box.svg \
+  qt/spectresecurity/res/img/ic-send.svg \
+  qt/spectresecurity/res/img/img-logo-spectresecurity@2x.png \
+  qt/spectresecurity/res/img/ic-arrow-purple-down.svg \
+  qt/spectresecurity/res/img/ic-connect.svg \
+  qt/spectresecurity/res/img/ic-submenu-lock.svg \
+  qt/spectresecurity/res/img/img-logo-spectresecurity@3x.png \
+  qt/spectresecurity/res/img/img-logo-spectresecurity.svg \
+  qt/spectresecurity/res/img/ic-arrow-right-white.svg \
+  qt/spectresecurity/res/img/ic-arrow-left-white.svg \
+  qt/spectresecurity/res/img/ic-arrow-left.svg \
+  qt/spectresecurity/res/img/ic-copy-liliac.svg \
+  qt/spectresecurity/res/img/ic-submenu-staking.svg \
+  qt/spectresecurity/res/img/img-nav-logo-spectresecurity.png \
+  qt/spectresecurity/res/img/ic-arrow-right.svg \
+  qt/spectresecurity/res/img/ic-copy.svg \
+  qt/spectresecurity/res/img/ic-copy-big.svg \
+  qt/spectresecurity/res/img/ic-copy-big-white.svg \
+  qt/spectresecurity/res/img/ic-submenu-unlock.svg \
+  qt/spectresecurity/res/img/img-nav-logo.png \
+  qt/spectresecurity/res/img/ic-arrow-white-left.svg \
+  qt/spectresecurity/res/img/ic-exit.svg \
+  qt/spectresecurity/res/img/ic-switch-liliac-on.svg \
+  qt/spectresecurity/res/img/img-nav-logo.svg \
+  qt/spectresecurity/res/img/ic-arrow-white-right.svg \
+  qt/spectresecurity/res/img/ic-expand.svg \
+  qt/spectresecurity/res/img/ic-switch-off.svg \
+  qt/spectresecurity/res/img/img-qr-test-big.png \
+  qt/spectresecurity/res/img/ic-check-active.svg \
+  qt/spectresecurity/res/img/ic-folder.svg \
+  qt/spectresecurity/res/img/ic-switch-on.svg \
+  qt/spectresecurity/res/img/img-qr-test.png \
+  qt/spectresecurity/res/img/ic-check-box.svg \
+  qt/spectresecurity/res/img/ic-check-box-dark-active.svg \
+  qt/spectresecurity/res/img/ic-check-box-indeterminate.svg \
+  qt/spectresecurity/res/img/ic-check-box-liliac-indeterminate.svg \
+  qt/spectresecurity/res/img/ic-label-liliac.svg \
+  qt/spectresecurity/res/img/ic-transaction-warning.svg \
+  qt/spectresecurity/res/img/ic-transaction-mint.svg \
+  qt/spectresecurity/res/img/ic-transaction-mint-inactive.svg \
+  qt/spectresecurity/res/img/ic-check-cold-staking.svg \
+  qt/spectresecurity/res/img/ic-check-cold-staking-off.svg \
+  qt/spectresecurity/res/img/ic-check-cold-staking-enabled.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-cs-contract.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-cs-contract-inactive.svg \
+  qt/spectresecurity/res/img/img-qr.svg \
+  qt/spectresecurity/res/img/ic-check-connect-off.svg \
+  qt/spectresecurity/res/img/ic-check-tor-off.svg \
+  qt/spectresecurity/res/img/ic-check-tor.svg \
+  qt/spectresecurity/res/img/ic-label.svg \
+  qt/spectresecurity/res/img/ic-transaction-received.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-received.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-warning.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-mint.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-mint-inactive.svg \
+  qt/spectresecurity/res/img/ic-transaction-received-inactive.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-received-inactive.svg \
+  qt/spectresecurity/res/img/img-welcome-step1.png \
+  qt/spectresecurity/res/img/ic-check-connect.svg \
+  qt/spectresecurity/res/img/ic-menu-hover.svg \
+  qt/spectresecurity/res/img/ic-transaction-sent.svg \
+  qt/spectresecurity/res/img/ic-transaction-sent-inactive.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-sent.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-sent-inactive.svg \
+  qt/spectresecurity/res/img/img-welcome-step2.png \
+  qt/spectresecurity/res/img/ic-check-dark.svg \
+  qt/spectresecurity/res/img/ic-mint.svg \
+  qt/spectresecurity/res/img/ic-transaction-staked.svg \
+  qt/spectresecurity/res/img/ic-transaction-staked-inactive.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-staked.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-staked-inactive.svg \
+  qt/spectresecurity/res/img/img-welcome-step3.png \
+  qt/spectresecurity/res/img/ic-check-liliac-on.svg \
+  qt/spectresecurity/res/img/ic-nav-address-active.svg \
+  qt/spectresecurity/res/img/ic-unlock-staking.svg \
+  qt/spectresecurity/res/img/img-welcome-step4.png \
+  qt/spectresecurity/res/img/ic-check-locked-off.svg \
+  qt/spectresecurity/res/img/ic-nav-address-hover.svg \
+  qt/spectresecurity/res/img/ic-update-liliac.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-down-purple.svg \
+  qt/spectresecurity/res/img/ic-arrow-drop-up-purple.svg \
+  qt/spectresecurity/res/img/ic-check-liliac-indeterminate.svg \
+  qt/spectresecurity/res/img/ic-check-box-liliac-indeterminate.svg \
+  qt/spectresecurity/res/img/ic-transaction-stake-delegated.svg \
+  qt/spectresecurity/res/img/ic-transaction-stake-delegated-inactive.svg \
+  qt/spectresecurity/res/img/ic-transaction-stake-hot.svg \
+  qt/spectresecurity/res/img/ic-transaction-stake-hot-inactive.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-stake-hot.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-stake-hot-inactive.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-stake-delegated.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-stake-delegated-inactive.svg \
+  qt/spectresecurity/res/img/ic-transaction-cs-contract.svg \
+  qt/spectresecurity/res/img/ic-transaction-cs-contract-inactive.svg \
+  qt/spectresecurity/res/img/ic-check-box-indeterminate.svg \
+  qt/spectresecurity/res/img/ic-information.svg \
+  qt/spectresecurity/res/img/ic-information-hover.svg \
+  qt/spectresecurity/res/img/ani-loading-dark.gif \
+  qt/spectresecurity/res/img/ani-loading.gif
+
+BITCOIN_QT_BASE_CPP = \
+  qt/bantablemodel.cpp \
+  qt/bitcoinaddressvalidator.cpp \
+  qt/spectresecurity/spectresecuritygui.cpp \
+  qt/bitcoinunits.cpp \
+  qt/clientmodel.cpp \
+  qt/csvmodelwriter.cpp \
+  qt/guiutil.cpp \
+  qt/intro.cpp \
+  qt/networkstyle.cpp \
+  qt/notificator.cpp \
+  qt/optionsdialog.cpp \
+  qt/optionsmodel.cpp \
+  qt/peertablemodel.cpp \
+  qt/platformstyle.cpp \
+  qt/qvalidatedlineedit.cpp \
+  qt/qvaluecombobox.cpp \
+  qt/rpcconsole.cpp \
+  qt/trafficgraphwidget.cpp \
+  qt/utilitydialog.cpp
+
+BITCOIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
+
+BITCOIN_QT_WALLET_CPP = \
+  qt/addressbookpage.cpp \
+  qt/addresstablemodel.cpp \
+  qt/askpassphrasedialog.cpp \
+  qt/coincontroldialog.cpp \
+  qt/coincontroltreewidget.cpp \
+  qt/editaddressdialog.cpp \
+  qt/openuridialog.cpp \
+  qt/paymentrequestplus.cpp \
+  qt/paymentserver.cpp \
+  qt/recentrequeststablemodel.cpp \
+  qt/transactionfilterproxy.cpp \
+  qt/transactionrecord.cpp \
+  qt/transactiontablemodel.cpp \
+  qt/walletmodel.cpp \
+  qt/walletmodeltransaction.cpp \
+  qt/spectresecurity/loadingdialog.cpp \
+  qt/spectresecurity/pwidget.cpp \
+  qt/spectresecurity/focuseddialog.cpp \
+  qt/spectresecurity/guitransactionsutils.cpp \
+  qt/spectresecurity/snackbar.cpp \
+  qt/spectresecurity/navmenuwidget.cpp \
+  qt/spectresecurity/lockunlock.cpp \
+  qt/spectresecurity/receivedialog.cpp \
+  qt/spectresecurity/furabstractlistitemdelegate.cpp \
+  qt/spectresecurity/txviewholder.cpp \
+  qt/spectresecurity/qtutils.cpp \
+  qt/spectresecurity/expandablebutton.cpp \
+  qt/spectresecurity/balancebubble.cpp \
+  qt/spectresecurity/topbar.cpp \
+  qt/spectresecurity/txrow.cpp \
+  qt/spectresecurity/addressholder.cpp \
+  qt/spectresecurity/addressfilterproxymodel.cpp \
+  qt/spectresecurity/dashboardwidget.cpp \
+  qt/spectresecurity/addresslabelrow.cpp \
+  qt/spectresecurity/contactdropdownrow.cpp \
+  qt/spectresecurity/contactsdropdown.cpp \
+  qt/spectresecurity/optionbutton.cpp \
+  qt/spectresecurity/mninfodialog.cpp \
+  qt/spectresecurity/coldstakingmodel.cpp \
+  qt/spectresecurity/mnmodel.cpp \
+  qt/spectresecurity/masternodewizarddialog.cpp \
+  qt/spectresecurity/mnrow.cpp \
+  qt/spectresecurity/masternodeswidget.cpp \
+  qt/spectresecurity/myaddressrow.cpp \
+  qt/spectresecurity/csrow.cpp \
+  qt/spectresecurity/sendchangeaddressdialog.cpp \
+  qt/spectresecurity/sendconfirmdialog.cpp \
+  qt/spectresecurity/sendcustomfeedialog.cpp \
+  qt/spectresecurity/sendmemodialog.cpp \
+  qt/spectresecurity/sendmultirow.cpp \
+  qt/spectresecurity/send.cpp \
+  qt/spectresecurity/addnewaddressdialog.cpp \
+  qt/spectresecurity/addnewcontactdialog.cpp \
+  qt/spectresecurity/requestdialog.cpp \
+  qt/spectresecurity/receivewidget.cpp \
+  qt/spectresecurity/tooltipmenu.cpp \
+  qt/spectresecurity/addresseswidget.cpp \
+  qt/spectresecurity/defaultdialog.cpp \
+  qt/spectresecurity/coldstakingwidget.cpp \
+  qt/spectresecurity/settings/settingsbackupwallet.cpp \
+  qt/spectresecurity/settings/settingsexportcsv.cpp \
+  qt/spectresecurity/settings/settingsbittoolwidget.cpp \
+  qt/spectresecurity/settings/settingsconsolewidget.cpp \
+  qt/spectresecurity/settings/settingsdisplayoptionswidget.cpp \
+  qt/spectresecurity/settings/settingsfaqwidget.cpp \
+  qt/spectresecurity/settings/settingsinformationwidget.cpp \
+  qt/spectresecurity/settings/settingsmainoptionswidget.cpp \
+  qt/spectresecurity/settings/settingsmultisenddialog.cpp \
+  qt/spectresecurity/settings/settingsmultisendwidget.cpp \
+  qt/spectresecurity/settings/settingssignmessagewidgets.cpp \
+  qt/spectresecurity/settings/settingswalletoptionswidget.cpp \
+  qt/spectresecurity/settings/settingswalletrepairwidget.cpp \
+  qt/spectresecurity/settings/settingswidget.cpp \
+  qt/spectresecurity/welcomecontentwidget.cpp \
+  qt/spectresecurity/splash.cpp
+
+
+BITCOIN_QT_CPP = $(BITCOIN_QT_BASE_CPP)
+if TARGET_WINDOWS
+BITCOIN_QT_CPP += $(BITCOIN_QT_WINDOWS_CPP)
+endif
+if ENABLE_WALLET
+BITCOIN_QT_CPP += $(BITCOIN_QT_WALLET_CPP)
+endif
+
+RES_IMAGES = \
+  qt/res/images/about.png \
+  qt/res/images/splash.png \
+  qt/res/images/splash_testnet.png \
+  qt/res/images/splash_regtest.png
+
+RES_CSS = \
+  qt/res/css/default.css \
+  qt/spectresecurity/res/css/style_dark.css \
+  qt/spectresecurity/res/css/style_light.css
+
+BITCOIN_RC = qt/res/spectresecurity-qt-res.rc
+
+BITCOIN_QT_INCLUDES = -I$(builddir)/qt -I$(srcdir)/qt -I$(srcdir)/qt/forms \
+  -I$(builddir)/qt/forms -DQT_NO_KEYWORDS
+
+qt_libbitcoinqt_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
+  $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
+qt_libbitcoinqt_a_CXXFLAGS = $(AM_CXXFLAGS) $(QT_PIE_FLAGS)
+qt_libbitcoinqt_a_OBJCXXFLAGS = $(AM_OBJCXXFLAGS) $(QT_PIE_FLAGS)
+
+qt_libbitcoinqt_a_SOURCES = $(BITCOIN_QT_CPP) $(BITCOIN_QT_H) $(QT_FORMS_UI) \
+  $(QT_QRC) $(QT_QRC_LOCALE) $(QT_TS) $(PROTOBUF_PROTO) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS)
+
+nodist_qt_libbitcoinqt_a_SOURCES = $(QT_MOC_CPP) $(QT_MOC) $(PROTOBUF_CC) \
+  $(PROTOBUF_H) $(QT_QRC_CPP) $(QT_QRC_LOCALE_CPP)
+
+# forms/foo.h -> forms/ui_foo.h
+QT_FORMS_H=$(join $(dir $(QT_FORMS_UI)),$(addprefix ui_, $(notdir $(QT_FORMS_UI:.ui=.h))))
+
+# Most files will depend on the forms and moc files as includes. Generate them
+# before anything else.
+$(QT_MOC): $(QT_FORMS_H)
+$(qt_libbitcoinqt_a_OBJECTS) $(qt_spectresecurity_qt_OBJECTS) : | $(QT_MOC)
+
+#Generating these with a half-written protobuf header leads to wacky results.
+#This makes sure it's done.
+$(QT_MOC): $(PROTOBUF_H)
+$(QT_MOC_CPP): $(PROTOBUF_H)
+
+# spectresecurity-qt binary #
+qt_spectresecurity_qt_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
+  $(QT_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
+qt_spectresecurity_qt_CXXFLAGS = $(AM_CXXFLAGS) $(QT_PIE_FLAGS)
+
+qt_spectresecurity_qt_SOURCES = qt/spectresecurity.cpp
+if TARGET_DARWIN
+  qt_spectresecurity_qt_SOURCES += $(BITCOIN_MM)
+endif
+if TARGET_WINDOWS
+  qt_spectresecurity_qt_SOURCES += $(BITCOIN_RC)
+endif
+qt_spectresecurity_qt_LDADD = qt/libbitcoinqt.a $(LIBBITCOIN_SERVER)
+if ENABLE_WALLET
+qt_spectresecurity_qt_LDADD += $(LIBBITCOIN_UTIL) $(LIBBITCOIN_WALLET)
+endif
+if ENABLE_ZMQ
+qt_spectresecurity_qt_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
+endif
+qt_spectresecurity_qt_LDADD += $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) $(LIBBITCOIN_ZEROCOIN) $(LIBSAPLING) $(LIBRUSTZCASH) $(LIBZCASH_LIBS) $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) \
+  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(PROTOBUF_LIBS) $(SVG_LIBS) $(CHARTS_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1) \
+  $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+qt_spectresecurity_qt_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(QT_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+qt_spectresecurity_qt_LIBTOOLFLAGS = $(AM_LIBTOOLFLAGS) --tag CXX
+
+#locale/foo.ts -> locale/foo.qm
+QT_QM=$(QT_TS:.ts=.qm)
+
+SECONDARY: $(QT_QM)
+
+$(srcdir)/qt/spectresecuritystrings.cpp: $(libbitcoin_server_a_SOURCES) $(libbitcoin_wallet_a_SOURCES) $(libbitcoin_common_a_SOURCES) $(libbitcoin_zmq_a_SOURCES) $(libbitcoin_util_a_SOURCES)
+	@test -n $(XGETTEXT) || echo "xgettext is required for updating translations"
+	$(AM_V_GEN) cd $(srcdir); XGETTEXT=$(XGETTEXT) PACKAGE_NAME="$(PACKAGE_NAME)" $(PYTHON) ../share/qt/extract_strings_qt.py $^
+
+translate: $(srcdir)/qt/spectresecuritystrings.cpp $(QT_FORMS_UI) $(QT_FORMS_UI) $(BITCOIN_QT_BASE_CPP) qt/spectresecurity.cpp $(BITCOIN_QT_WINDOWS_CPP) $(BITCOIN_QT_WALLET_CPP) $(BITCOIN_QT_H) $(BITCOIN_MM)
+	@test -n $(LUPDATE) || echo "lupdate is required for updating translations"
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(LUPDATE) $^ -locations relative -no-obsolete -ts $(srcdir)/qt/locale/spectresecurity_en.ts
+
+$(QT_QRC_LOCALE_CPP): $(QT_QRC_LOCALE) $(QT_QM)
+	@test -f $(RCC)
+	@cp -f $< $(@D)/temp_$(<F)
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(RCC) -name spectresecurity_locale $(@D)/temp_$(<F) | \
+	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@
+	@rm $(@D)/temp_$(<F)
+
+$(QT_QRC_CPP): $(QT_QRC) $(QT_FORMS_H) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS) $(PROTOBUF_H)
+	@test -f $(RCC)
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(RCC) -name spectresecurity $< | \
+	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@
+
+CLEAN_QT = $(nodist_qt_libbitcoinqt_a_SOURCES) $(QT_QM) $(QT_FORMS_H) qt/*.gcda qt/*.gcno qt/spectresecurity/*.gcda qt/spectresecurity/*.gcno qt/spectresecurity/settings/*.gcda qt/spectresecurity/settings/*.gcno qt/temp_spectresecurity_locale.qrc
+
+CLEANFILES += $(CLEAN_QT)
+
+spectresecurity_qt_clean: FORCE
+	rm -f $(CLEAN_QT) $(qt_libbitcoinqt_a_OBJECTS) $(qt_spectresecurity_qt_OBJECTS) qt/spectresecurity-qt$(EXEEXT) $(LIBBITCOINQT)
+
+spectresecurity_qt : qt/spectresecurity-qt$(EXEEXT)
+
+ui_%.h: %.ui
+	@test -f $(UIC)
+	@$(MKDIR_P) $(@D)
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(UIC) -o $@ $< || (echo "Error creating $@"; false)
+
+%.moc: %.cpp
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(MOC) $(DEFAULT_INCLUDES) $(QT_INCLUDES) $(MOC_DEFS) $< | \
+	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@
+
+moc_%.cpp: %.h
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(MOC) $(DEFAULT_INCLUDES) $(QT_INCLUDES) $(MOC_DEFS) $< | \
+	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@
+
+%.qm: %.ts
+	@test -f $(LRELEASE)
+	@$(MKDIR_P) $(@D)
+	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(LRELEASE) -silent $< -qm $@
