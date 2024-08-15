@@ -796,7 +796,7 @@ CAmount GetBlockValue(int nHeight)
     if (nHeight > nLast)   return 6    * COIN;
     if (nHeight !=1)       return 25  * COIN;
     // Premine for 6 masternodes at block 1
-    return 250000001 * COIN;
+    return 200000001 * COIN;
 }
 
 int64_t GetMasternodePayment()
