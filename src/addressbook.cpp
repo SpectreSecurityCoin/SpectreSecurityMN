@@ -1,9 +1,8 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "addressbook.h"
-#include <string>
 
 namespace AddressBook {
 
@@ -17,6 +16,7 @@ namespace AddressBook {
         const std::string COLD_STAKING_SEND{"coldstaking_send"};
         const std::string SHIELDED_RECEIVE{"shielded_receive"};
         const std::string SHIELDED_SEND{"shielded_spend"};
+        const std::string EXCHANGE_ADDRESS{"exchange_address"};
     }
 
     bool IsColdStakingPurpose(const std::string& purpose) {
@@ -27,6 +27,10 @@ namespace AddressBook {
     bool IsShieldedPurpose(const std::string& purpose) {
         return purpose == AddressBookPurpose::SHIELDED_RECEIVE
                || purpose == AddressBookPurpose::SHIELDED_SEND;
+    }
+
+    bool IsExchangePurpose(const std::string& purpose)  {
+        return purpose == AddressBookPurpose::EXCHANGE_ADDRESS;
     }
 
     bool CAddressBookData::isSendColdStakingPurpose() const {

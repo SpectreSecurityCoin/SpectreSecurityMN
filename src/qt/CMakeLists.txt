@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 
 set(QT_MINIMUM_VERSION 5.5.1)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -21,7 +21,7 @@ foreach(comp Widgets Core Gui Network LinguistTools DBus Svg Charts)
         add_definitions(${Qt5${comp}_DEFINITIONS})
         list(APPEND Qt5_LIBRARIES ${Qt5${comp}_LIBRARIES})
     else()
-        MESSAGE(WARNING "Cant find Qt5${comp}")
+        MESSAGE(WARNING "Can't find Qt5${comp}")
     endif()
 endforeach(comp)
 
@@ -49,14 +49,6 @@ if (QRCODE_FOUND)
     link_directories ( ${QRCODE_LIBRARY_DIRS} )
 endif()
 
-find_program(MOC_BIN NAMES moc moc-qt5 qt5-moc
-        PATHS /usr/lib/qt5/bin /usr/lib/x86_64-linux-gnu/qt5/bin /usr/local/opt/qt/bin /usr/local/opt/qt5/bin
-        NO_DEFAULT_PATH
-        NO_SYSTEM_ENVIRONMENT_PATH)
-if (MOC_BIN)
-    MESSAGE(STATUS "FOUND MOC ${MOC_BIN}")
-endif ()
-
 add_compile_options("-DQT_NO_KEYWORDS")
 
 # Why isn't this done automatically??
@@ -66,16 +58,6 @@ endif()
 
 file(GLOB LOCAL_QT_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
 source_group("QtHeaders" FILES ${LOCAL_QT_HEADERS})
-
-find_package(Protobuf REQUIRED)
-if(Protobuf_FOUND)
-    message(STATUS "Found Protobuf compiler: ${Protobuf_PROTOC_EXECUTABLE}")
-    message(STATUS "Found Protobuf library: ${Protobuf_LIBRARIES}")
-endif()
-include_directories(${PROTOBUF_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/paymentrequest.proto)
 
 SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/bantablemodel.cpp
@@ -87,25 +69,21 @@ SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/intro.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/networkstyle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/notificator.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/optionsdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/optionsmodel.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/peertablemodel.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/platformstyle.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/qvalidatedlineedit.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/qvaluecombobox.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/rpcconsole.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rpcexecutor.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/trafficgraphwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/utilitydialog.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/addressbookpage.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/addresstablemodel.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/askpassphrasedialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/coincontroldialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/coincontroltreewidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/editaddressdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/openuridialog.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/paymentrequestplus.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/paymentserver.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/recentrequeststablemodel.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/transactionfilterproxy.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/transactionrecord.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/transactiontablemodel.cpp
@@ -145,7 +123,6 @@ SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/sendmemodialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/sendmultirow.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/send.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/addnewaddressdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/addnewcontactdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/requestdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/receivewidget.cpp
@@ -156,6 +133,12 @@ SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/addresseswidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/defaultdialog.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/coldstakingwidget.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/mnselectiondialog.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/proposalcard.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/votedialog.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/createproposaldialog.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/proposalinfodialog.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/governancewidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsbackupwallet.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsbittoolwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsconsolewidget.cpp
@@ -163,8 +146,6 @@ SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsfaqwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsinformationwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsmainoptionswidget.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsmultisenddialog.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsmultisendwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingssignmessagewidgets.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingswalletoptionswidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingswalletrepairwidget.cpp
@@ -172,19 +153,10 @@ SET(QT_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingswidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/welcomecontentwidget.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/splash.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/governancemodel.cpp
         )
 
-# Workaround until the old rpcconsole UI window is fully removed
-set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings/settingsconsolewidget.cpp PROPERTY SKIP_AUTOMOC ON)
-execute_process(
-        COMMAND ${MOC_BIN} -o moc_settingsconsolewidget.cpp settingsconsolewidget.h
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings
-)
-
-execute_process(
-        COMMAND ${MOC_BIN} -o moc_pfborderimage.cpp pfborderimage.h
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity
-)
+qt5_generate_moc(spectresecurity/pfborderimage.h ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/moc_pfborderimage.cpp)
 list(APPEND QT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/moc_pfborderimage.cpp)
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -197,13 +169,16 @@ target_include_directories(qt_stuff PUBLIC ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/src/leveldb/include
         ${CMAKE_SOURCE_DIR}/src/univalue/include
         ${CMAKE_SOURCE_DIR}/src/secp256k1/include
+        ${CMAKE_SOURCE_DIR}/src/chiabls/src
+        ${relic_SOURCE_DIR}/include
+        ${relic_BINARY_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity
         ${CMAKE_CURRENT_SOURCE_DIR}/spectresecurity/settings
-        ${OPENSSL_INCLUDE_DIR}
         ${BerkeleyDB_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
         )
-set_property(TARGET qt_stuff PROPERTY CXX_STANDARD 11)
+set_property(TARGET qt_stuff PROPERTY CXX_STANDARD 14)
 
 file(GLOB QT_TRANSLATIONS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/locale/*.ts)
 
@@ -217,23 +192,19 @@ QT5_ADD_RESOURCES(QRC_RESOURCE spectresecurity.qrc)
 QT5_ADD_RESOURCES(QRC_LOCALE_RESOURCE spectresecurity_locale.qrc)
 
 add_executable(spectresecurity-qt spectresecurity.cpp ${QM} ${QRC_RESOURCE} ${QRC_LOCALE_RESOURCE})
-add_dependencies(spectresecurity-qt translations_target libunivalue libsecp256k1 libzcashrust leveldb crc32c)
-target_include_directories(spectresecurity-qt PUBLIC ${ENDIAN_INCLUDES})
+add_dependencies(spectresecurity-qt translations_target libunivalue libsecp256k1 libzcashrust leveldb crc32c bls)
+target_include_directories(spectresecurity-qt PUBLIC ${ENDIAN_INCLUDES} ${GMP_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${sodium_INCLUDE_DIR})
 target_link_libraries(spectresecurity-qt
         qt_stuff
         univalue
         SERVER_A WALLET_A COMMON_A ZEROCOIN_A UTIL_A SAPLING_A BITCOIN_CRYPTO_A CLI_A
-        leveldb crc32c secp256k1 rustzcash
-        ${BerkeleyDB_LIBRARIES} ${OPENSSL_LIBRARIES} ${Boost_LIBRARIES} ${PROTOBUF_LIBRARIES} ${LIBEVENT_LIB}
-        ${sodium_LIBRARY_RELEASE}
+        leveldb crc32c secp256k1 rustzcash bls
+        ${BerkeleyDB_LIBRARIES} ${Boost_LIBRARIES} ${LIBEVENT_LIB}
+        ${sodium_LIBRARY_RELEASE} ${GMP_LIBRARY}
         -ldl pthread
         )
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_link_libraries(spectresecurity-qt "-framework Cocoa")
-endif()
-if(GMP_FOUND)
-    target_link_libraries(spectresecurity-qt ${GMP_LIBRARY})
-    target_include_directories(spectresecurity-qt PUBLIC ${GMP_INCLUDE_DIR})
 endif()
 if(ZMQ_FOUND)
     target_link_libraries(spectresecurity-qt ZMQ_A ${ZMQ_LIB})
@@ -247,6 +218,10 @@ if(MINIUPNP_FOUND)
     target_compile_definitions(spectresecurity-qt PUBLIC "-DSTATICLIB -DMINIUPNP_STATICLIB")
     target_link_libraries(spectresecurity-qt ${MINIUPNP_LIBRARY})
     target_include_directories(spectresecurity-qt PUBLIC ${MINIUPNP_INCLUDE_DIR})
+endif()
+if(NAT-PMP_FOUND)
+    target_link_libraries(spectresecurity-qt ${NAT-PMP_LIBRARY})
+    target_include_directories(spectresecurity-qt PUBLIC ${NAT-PMP_INCLUDE_DIR})
 endif()
 
 target_link_libraries(spectresecurity-qt Qt5::Gui Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${QT_LIBRARIES})

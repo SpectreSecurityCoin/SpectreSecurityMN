@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) 2018 The Zcash developers
-# Copyright (c) 2020 The SPECTRESECURITY developers
+# Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+from decimal import Decimal
+from time import sleep
 
 from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
@@ -11,13 +14,10 @@ from test_framework.util import (
     connect_nodes,
     disconnect_nodes,
     satoshi_round,
-    sync_mempools,
     get_coinstake_address,
     wait_until,
 )
 
-from decimal import Decimal
-from time import sleep
 
 # Test wallet behaviour with Sapling addresses
 class WalletSaplingTest(SpectresecurityTestFramework):
@@ -28,11 +28,11 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.extra_args = [saplingUpgrade, saplingUpgrade, saplingUpgrade, saplingUpgrade]
         self.extra_args[0].append('-sporkkey=932HEevBSujW2ud7RfB1YF91AFygbBRQj3de3LyaCRqNzKKgWXi')
 
-    def check_tx_priority(self, txids):
-        sync_mempools(self.nodes)
+    def check_tx_in_mempool(self, txids):
+        self.sync_mempools()
         mempool = self.nodes[0].getrawmempool(True)
         for txid in txids:
-            assert(Decimal(mempool[txid]['startingpriority']) == Decimal('1E+25'))
+            assert txid in mempool
 
     def wait_for_spork(self, fEnabled, spork_id):
         sleep(2)
@@ -48,8 +48,8 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         saplingAddr1 = self.nodes[1].getnewshieldaddress()
 
         # Verify addresses
-        assert(saplingAddr0 in self.nodes[0].listshieldaddresses())
-        assert(saplingAddr1 in self.nodes[1].listshieldaddresses())
+        assert saplingAddr0 in self.nodes[0].listshieldaddresses()
+        assert saplingAddr1 in self.nodes[1].listshieldaddresses()
 
         # Verify balance
         assert_equal(self.nodes[0].getshieldbalance(saplingAddr0), Decimal('0'))
@@ -93,10 +93,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         # shield more funds automatically selecting the transparent inputs
         self.log.info("TX 2: shield funds from any transparent address.")
         mytxid2 = self.nodes[0].shieldsendmany("from_transparent", recipients, 1, fee)
-
-        # Verify priority of tx is INF_PRIORITY, defined as 1E+25 (10000000000000000000000000)
-        self.check_tx_priority([mytxid1, mytxid2])
-        self.log.info("Priority for tx1 and tx2 checks out")
+        self.check_tx_in_mempool([mytxid1, mytxid2])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -114,7 +111,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("Good. Not accepted when SPORK_20 is active.")
 
         # Try with RPC...
-        assert_raises_rpc_error(-8, "Invalid parameter, Sapling not active yet",
+        assert_raises_rpc_error(-8, "SHIELD in maintenance (SPORK 20)",
                                 self.nodes[0].shieldsendmany, "from_transparent", recipients, 1, fee)
 
         # Disable SPORK_20 and retry
@@ -123,10 +120,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.wait_for_spork(False, SPORK_20)
         mytxid3 = self.nodes[0].sendrawtransaction(tx_hex)
         self.log.info("Good. Accepted when SPORK_20 is not active.")
-
-        # Verify priority of tx is INF_PRIORITY, defined as 1E+25 (10000000000000000000000000)
-        self.check_tx_priority([mytxid3])
-        self.log.info("Priority for tx3 checks out")
+        self.check_tx_in_mempool([mytxid3])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -154,6 +148,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         sleep(1)
         self.deactivate_spork(0, SPORK_20)
         self.nodes[0].reconsiderblock(tip_hash)
+        self.nodes[0].syncwithvalidationinterfacequeue()
         assert_equal(tip_hash, self.nodes[0].getbestblockhash())    # Block connected
         assert_equal(self.nodes[0].getshieldbalance(saplingAddr0), Decimal('30'))
         self.log.info("Reconnected after deactivation of SPORK_20. Balance restored.")
@@ -165,7 +160,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX 4: shield transaction from specified sapling address.")
         recipients4 = [{"address": saplingAddr1, "amount": Decimal('10')}]
         mytxid4 = self.nodes[0].shieldsendmany(saplingAddr0, recipients4, 1, fee)
-        self.check_tx_priority([mytxid4])
+        self.check_tx_in_mempool([mytxid4])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -174,7 +169,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX 5: shield transaction from any sapling address.")
         recipients5 = [{"address": saplingAddr1, "amount": Decimal('5')}]
         mytxid5 = self.nodes[0].shieldsendmany("from_shield", recipients5, 1, fee)
-        self.check_tx_priority([mytxid5])
+        self.check_tx_in_mempool([mytxid5])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -183,7 +178,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX 6: shield raw transaction.")
         tx_hex = self.nodes[0].rawshieldsendmany("from_shield", recipients5, 1, fee)
         mytxid6 = self.nodes[0].sendrawtransaction(tx_hex)
-        self.check_tx_priority([mytxid6])
+        self.check_tx_in_mempool([mytxid6])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -193,7 +188,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX 7: shield funds to later verify multi source notes spending.")
         recipients = [{"address": saplingAddr2, "amount": Decimal('10')}]
         mytxid7 = self.nodes[0].shieldsendmany(get_coinstake_address(self.nodes[0]), recipients, 1, fee)
-        self.check_tx_priority([mytxid7])
+        self.check_tx_in_mempool([mytxid7])
 
         self.nodes[2].generate(5)
         self.sync_all()
@@ -203,7 +198,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX 8: verifying multi source notes spending.")
         recipients = [{"address": tAddr0, "amount": Decimal('11')}]
         mytxid8 = self.nodes[0].shieldsendmany("from_shield", recipients, 1, fee)
-        self.check_tx_priority([mytxid8])
+        self.check_tx_in_mempool([mytxid8])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -224,7 +219,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         recipients7 = [{"address": saplingAddr0, "amount": Decimal('8')}]
         recipients7.append({"address": taddr1, "amount": Decimal('10')})
         mytxid7 = self.nodes[1].shieldsendmany(saplingAddr1, recipients7, 1, fee)
-        self.check_tx_priority([mytxid7])
+        self.check_tx_in_mempool([mytxid7])
 
         self.nodes[2].generate(1)
         self.sync_all()
@@ -240,21 +235,21 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         assert_equal(Decimal(resp['valueBalance']), Decimal('10.05'))    # 20 shield input - 8 shield spend - 1.95 change
         assert_equal(len(resp['vShieldSpend']), 3)
         assert_equal(len(resp['vShieldOutput']), 2)
-        assert('bindingSig' in resp)
+        assert 'bindingSig' in resp
         shieldedSpend = resp['vShieldSpend'][0]
-        assert('cv' in shieldedSpend)
-        assert('anchor' in shieldedSpend)
-        assert('nullifier' in shieldedSpend)
-        assert('rk' in shieldedSpend)
-        assert('proof' in shieldedSpend)
-        assert('spendAuthSig' in shieldedSpend)
+        assert 'cv' in shieldedSpend
+        assert 'anchor' in shieldedSpend
+        assert 'nullifier' in shieldedSpend
+        assert 'rk' in shieldedSpend
+        assert 'proof' in shieldedSpend
+        assert 'spendAuthSig' in shieldedSpend
         shieldedOutput = resp['vShieldOutput'][0]
-        assert('cv' in shieldedOutput)
-        assert('cmu' in shieldedOutput)
-        assert('ephemeralKey' in shieldedOutput)
-        assert('encCiphertext' in shieldedOutput)
-        assert('outCiphertext' in shieldedOutput)
-        assert('proof' in shieldedOutput)
+        assert 'cv' in shieldedOutput
+        assert 'cmu' in shieldedOutput
+        assert 'ephemeralKey' in shieldedOutput
+        assert 'encCiphertext' in shieldedOutput
+        assert 'outCiphertext' in shieldedOutput
+        assert 'proof' in shieldedOutput
         self.log.info("Raw transaction decoding checks out")
 
         # Verify importing a spending key will update the nullifiers and witnesses correctly
@@ -288,7 +283,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         prev_balance = self.nodes[0].getbalance()
         recipients8 = {saplingAddr0: Decimal('8'), saplingAddr1: Decimal('1'), saplingAddr2: Decimal('0.5')}
         mytxid11 = self.nodes[0].sendmany("", recipients8)
-        self.check_tx_priority([mytxid11])
+        self.check_tx_in_mempool([mytxid11])
         self.log.info("Done. Checking details and balances...")
 
         # Decrypted transaction details should be correct
@@ -328,7 +323,7 @@ class WalletSaplingTest(SpectresecurityTestFramework):
         self.log.info("TX12: Shielding coins with sendtoaddress RPC...")
         prev_balance = self.nodes[0].getbalance()
         mytxid12 = self.nodes[0].sendtoaddress(saplingAddr0, Decimal('10'))
-        self.check_tx_priority([mytxid12])
+        self.check_tx_in_mempool([mytxid12])
         self.log.info("Done. Checking details and balances...")
 
         # Decrypted transaction details should be correct

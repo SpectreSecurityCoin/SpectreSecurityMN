@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,7 +15,7 @@ MyAddressRow::MyAddressRow(QWidget *parent) :
     ui->labelDate->setProperty("cssClass", "text-list-caption");
 }
 
-void MyAddressRow::updateView(QString address, QString label, QString date){
+void MyAddressRow::updateView(const QString& address, const QString& label, const QString& date){
     ui->labelName->setText(label);
     ui->labelAddress->setText(address);
     if (date.isEmpty()){

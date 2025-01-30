@@ -1,15 +1,14 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef MASTERNODESWIDGET_H
 #define MASTERNODESWIDGET_H
 
-#include "qt/spectresecurity/pwidget.h"
+#include "coincontroldialog.h"
 #include "qt/spectresecurity/furabstractlistitemdelegate.h"
-#include "qt/spectresecurity/mnmodel.h"
+#include "qt/spectresecurity/pwidget.h"
 #include "qt/spectresecurity/tooltipmenu.h"
-#include "walletmodel.h"
 
 #include <atomic>
 
@@ -17,6 +16,7 @@
 #include <QWidget>
 
 class SPECTRESECURITYGUI;
+class MNModel;
 
 namespace Ui {
 class MasterNodesWidget;
@@ -34,8 +34,8 @@ public:
 
     explicit MasterNodesWidget(SPECTRESECURITYGUI *parent = nullptr);
     ~MasterNodesWidget();
-
-    void loadWalletModel() override;
+    void resetCoinControl();
+    void setMNModel(MNModel* _mnModel);
 
     void run(int type) override;
     void onError(QString error, int type) override;
@@ -44,6 +44,7 @@ public:
     void hideEvent(QHideEvent *event) override;
 
 private Q_SLOTS:
+    void onCoinControlClicked();
     void onCreateMNClicked();
     void onStartAllClicked(int type);
     void changeTheme(bool isLightTheme, QString &theme) override;
@@ -52,7 +53,7 @@ private Q_SLOTS:
     void onDeleteMNClicked();
     void onInfoMNClicked();
     void updateListState();
-    void updateModelAndInform(QString informText);
+    void updateModelAndInform(const QString& informText);
 
 private:
     Ui::MasterNodesWidget *ui;
@@ -61,13 +62,13 @@ private:
     TooltipMenu* menu = nullptr;
     QModelIndex index;
     QTimer *timer = nullptr;
+    CoinControlDialog* coinControlDialog = nullptr;
 
     std::atomic<bool> isLoading;
 
     bool checkMNsNetwork();
-    void startAlias(QString strAlias);
+    void startAlias(const QString& strAlias);
     bool startAll(QString& failedMN, bool onlyMissing);
-    bool startMN(CMasternodeConfig::CMasternodeEntry mne, std::string& strError);
 };
 
 #endif // MASTERNODESWIDGET_H

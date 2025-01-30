@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,15 +10,15 @@
 
 #include "qt/guiutil.h"
 #include "clientmodel.h"
+#include "interfaces/handler.h"
 #include "optionsmodel.h"
 #include "networkstyle.h"
 #include "notificator.h"
 #include "guiinterface.h"
 #include "qt/spectresecurity/qtutils.h"
 #include "qt/spectresecurity/defaultdialog.h"
-
-#include "init.h"
-#include "util.h"
+#include "shutdown.h"
+#include "util/system.h"
 
 #include <QApplication>
 #include <QColor>
@@ -58,14 +58,14 @@ SPECTRESECURITYGUI::SPECTRESECURITYGUI(const NetworkStyle* networkStyle, QWidget
 
 #ifdef ENABLE_WALLET
     /* if compiled with wallet support, -disablewallet can still disable the wallet */
-    enableWallet = !gArgs.GetBoolArg("-disablewallet", false);
+    enableWallet = !gArgs.GetBoolArg("-disablewallet", DEFAULT_DISABLE_WALLET);
 #else
     enableWallet = false;
 #endif // ENABLE_WALLET
 
     QString windowTitle = QString::fromStdString(gArgs.GetArg("-windowtitle", ""));
     if (windowTitle.isEmpty()) {
-        windowTitle = tr("SPECTRESECURITY Core") + " - ";
+        windowTitle = QString{PACKAGE_NAME} + " - ";
         windowTitle += ((enableWallet) ? tr("Wallet") : tr("Node"));
     }
     windowTitle += " " + networkStyle->getTitleAddText();
@@ -125,6 +125,7 @@ SPECTRESECURITYGUI::SPECTRESECURITYGUI(const NetworkStyle* networkStyle, QWidget
         addressesWidget = new AddressesWidget(this);
         masterNodesWidget = new MasterNodesWidget(this);
         coldStakingWidget = new ColdStakingWidget(this);
+        governancewidget = new GovernanceWidget(this);
         settingsWidget = new SettingsWidget(this);
 
         // Add to parent
@@ -134,6 +135,7 @@ SPECTRESECURITYGUI::SPECTRESECURITYGUI(const NetworkStyle* networkStyle, QWidget
         stackedContainer->addWidget(addressesWidget);
         stackedContainer->addWidget(masterNodesWidget);
         stackedContainer->addWidget(coldStakingWidget);
+        stackedContainer->addWidget(governancewidget);
         stackedContainer->addWidget(settingsWidget);
         stackedContainer->setCurrentWidget(dashboard);
 
@@ -201,6 +203,8 @@ void SPECTRESECURITYGUI::connectActions()
     connect(masterNodesWidget, &MasterNodesWidget::execDialog, this, &SPECTRESECURITYGUI::execDialog);
     connect(coldStakingWidget, &ColdStakingWidget::showHide, this, &SPECTRESECURITYGUI::showHide);
     connect(coldStakingWidget, &ColdStakingWidget::execDialog, this, &SPECTRESECURITYGUI::execDialog);
+    connect(governancewidget, &GovernanceWidget::showHide, this, &SPECTRESECURITYGUI::showHide);
+    connect(governancewidget, &GovernanceWidget::execDialog, this, &SPECTRESECURITYGUI::execDialog);
     connect(settingsWidget, &SettingsWidget::execDialog, this, &SPECTRESECURITYGUI::execDialog);
 }
 
@@ -209,7 +213,7 @@ void SPECTRESECURITYGUI::createTrayIcon(const NetworkStyle* networkStyle)
 {
 #ifndef Q_OS_MAC
     trayIcon = new QSystemTrayIcon(this);
-    QString toolTip = tr("SPECTRESECURITY Core client") + " " + networkStyle->getTitleAddText();
+    QString toolTip = tr("%1 client").arg(PACKAGE_NAME) + " " + networkStyle->getTitleAddText();
     trayIcon->setToolTip(toolTip);
     trayIcon->setIcon(networkStyle->getAppIcon());
     trayIcon->hide();
@@ -250,7 +254,9 @@ void SPECTRESECURITYGUI::setClientModel(ClientModel* _clientModel)
         topBar->setClientModel(clientModel);
         dashboard->setClientModel(clientModel);
         sendWidget->setClientModel(clientModel);
+        masterNodesWidget->setClientModel(clientModel);
         settingsWidget->setClientModel(clientModel);
+        governancewidget->setClientModel(clientModel);
 
         // Receive and report messages from client model
         connect(clientModel, &ClientModel::message, this, &SPECTRESECURITYGUI::message);
@@ -259,6 +265,7 @@ void SPECTRESECURITYGUI::setClientModel(ClientModel* _clientModel)
         });
         connect(topBar, &TopBar::walletSynced, dashboard, &DashboardWidget::walletSynced);
         connect(topBar, &TopBar::walletSynced, coldStakingWidget, &ColdStakingWidget::walletSynced);
+        connect(topBar, &TopBar::tierTwoSynced, governancewidget, &GovernanceWidget::tierTwoSynced);
 
         // Get restart command-line parameters and handle restart
         connect(settingsWidget, &SettingsWidget::handleRestart, [this](QStringList arg){handleRestart(arg);});
@@ -336,6 +343,9 @@ void SPECTRESECURITYGUI::changeEvent(QEvent* e)
             if (!(wsevt->oldState() & Qt::WindowMinimized) && isMinimized()) {
                 QTimer::singleShot(0, this, &SPECTRESECURITYGUI::hide);
                 e->ignore();
+            } else if ((wsevt->oldState() & Qt::WindowMinimized) && !isMinimized()) {
+                QTimer::singleShot(0, this, &SPECTRESECURITYGUI::show);
+                e->ignore();
             }
         }
     }
@@ -348,10 +358,14 @@ void SPECTRESECURITYGUI::closeEvent(QCloseEvent* event)
     if (clientModel && clientModel->getOptionsModel()) {
         if (!clientModel->getOptionsModel()->getMinimizeOnClose()) {
             QApplication::quit();
+        } else {
+            QMainWindow::showMinimized();
+            event->ignore();
         }
     }
-#endif
+#else
     QMainWindow::closeEvent(event);
+#endif
 }
 
 
@@ -366,7 +380,7 @@ void SPECTRESECURITYGUI::messageInfo(const QString& text)
 
 void SPECTRESECURITYGUI::message(const QString& title, const QString& message, unsigned int style, bool* ret)
 {
-    QString strTitle =  tr("SPECTRESECURITY Core"); // default title
+    QString strTitle = QString{PACKAGE_NAME}; // default title
     // Default to information icon
     int nNotifyIcon = Notificator::Information;
 
@@ -411,7 +425,7 @@ void SPECTRESECURITYGUI::message(const QString& title, const QString& message, u
         } else {
             r = openStandardDialog((title.isEmpty() ? strTitle : title), message, "OK");
         }
-        if (ret != NULL)
+        if (ret != nullptr)
             *ret = r;
     } else if (style & CClientUIInterface::MSG_INFORMATION_SNACK) {
         messageInfo(message);
@@ -419,7 +433,7 @@ void SPECTRESECURITYGUI::message(const QString& title, const QString& message, u
         // Append title to "SPECTRESECURITY - "
         if (!msgType.isEmpty())
             strTitle += " - " + msgType;
-        notificator->notify((Notificator::Class) nNotifyIcon, strTitle, message);
+        notificator->notify(static_cast<Notificator::Class>(nNotifyIcon), strTitle, message);
     }
 }
 
@@ -435,7 +449,7 @@ bool SPECTRESECURITYGUI::openStandardDialog(QString title, QString body, QString
     } else {
         dialog = new DefaultDialog();
         dialog->setText(title, body, okBtn);
-        dialog->setWindowTitle(tr("SPECTRESECURITY Core"));
+        dialog->setWindowTitle(PACKAGE_NAME);
         dialog->adjustSize();
         dialog->raise();
         dialog->exec();
@@ -491,12 +505,18 @@ void SPECTRESECURITYGUI::goToAddresses()
 
 void SPECTRESECURITYGUI::goToMasterNodes()
 {
+    masterNodesWidget->resetCoinControl();
     showTop(masterNodesWidget);
 }
 
 void SPECTRESECURITYGUI::goToColdStaking()
 {
     showTop(coldStakingWidget);
+}
+
+void SPECTRESECURITYGUI::goToGovernance()
+{
+    showTop(governancewidget);
 }
 
 void SPECTRESECURITYGUI::goToSettings(){
@@ -592,7 +612,7 @@ int SPECTRESECURITYGUI::getNavWidth()
 void SPECTRESECURITYGUI::openFAQ(SettingsFaqWidget::Section section)
 {
     showHide(true);
-    SettingsFaqWidget* dialog = new SettingsFaqWidget(this);
+    SettingsFaqWidget* dialog = new SettingsFaqWidget(this, mnModel);
     dialog->setSection(section);
     openDialogWithOpaqueBackgroundFullScreen(dialog, this);
     dialog->deleteLater();
@@ -600,6 +620,20 @@ void SPECTRESECURITYGUI::openFAQ(SettingsFaqWidget::Section section)
 
 
 #ifdef ENABLE_WALLET
+void SPECTRESECURITYGUI::setGovModel(GovernanceModel* govModel)
+{
+    if (!stackedContainer || !clientModel) return;
+    governancewidget->setGovModel(govModel);
+}
+
+void SPECTRESECURITYGUI::setMNModel(MNModel* _mnModel)
+{
+    if (!stackedContainer || !clientModel) return;
+    mnModel = _mnModel;
+    governancewidget->setMNModel(mnModel);
+    masterNodesWidget->setMNModel(mnModel);
+}
+
 bool SPECTRESECURITYGUI::addWallet(const QString& name, WalletModel* walletModel)
 {
     // Single wallet supported for now..
@@ -615,6 +649,7 @@ bool SPECTRESECURITYGUI::addWallet(const QString& name, WalletModel* walletModel
     addressesWidget->setWalletModel(walletModel);
     masterNodesWidget->setWalletModel(walletModel);
     coldStakingWidget->setWalletModel(walletModel);
+    governancewidget->setWalletModel(walletModel);
     settingsWidget->setWalletModel(walletModel);
 
     // Connect actions..
@@ -625,6 +660,7 @@ bool SPECTRESECURITYGUI::addWallet(const QString& name, WalletModel* walletModel
     connect(sendWidget, &SendWidget::message,this, &SPECTRESECURITYGUI::message);
     connect(receiveWidget, &ReceiveWidget::message,this, &SPECTRESECURITYGUI::message);
     connect(addressesWidget, &AddressesWidget::message,this, &SPECTRESECURITYGUI::message);
+    connect(governancewidget, &GovernanceWidget::message,this, &SPECTRESECURITYGUI::message);
     connect(settingsWidget, &SettingsWidget::message, this, &SPECTRESECURITYGUI::message);
 
     // Pass through transaction notifications
@@ -649,7 +685,7 @@ void SPECTRESECURITYGUI::incomingTransaction(const QString& date, int unit, cons
     // Only send notifications when not disabled
     if (!bdisableSystemnotifications) {
         // On new transaction, make an info balloon
-        message((amount) < 0 ? (pwalletMain->fMultiSendNotify == true ? tr("Sent MultiSend transaction") : tr("Sent transaction")) : tr("Incoming transaction"),
+        message(amount < 0 ? tr("Sent transaction") : tr("Incoming transaction"),
             tr("Date: %1\n"
                "Amount: %2\n"
                "Type: %3\n"
@@ -659,8 +695,6 @@ void SPECTRESECURITYGUI::incomingTransaction(const QString& date, int unit, cons
                 .arg(type)
                 .arg(address),
             CClientUIInterface::MSG_INFORMATION);
-
-        pwalletMain->fMultiSendNotify = false;
     }
 }
 
@@ -689,11 +723,11 @@ static bool ThreadSafeMessageBox(SPECTRESECURITYGUI* gui, const std::string& mes
 void SPECTRESECURITYGUI::subscribeToCoreSignals()
 {
     // Connect signals to client
-    uiInterface.ThreadSafeMessageBox.connect(boost::bind(ThreadSafeMessageBox, this, _1, _2, _3));
+    m_handler_message_box = interfaces::MakeHandler(uiInterface.ThreadSafeMessageBox.connect(std::bind(ThreadSafeMessageBox, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)));
 }
 
 void SPECTRESECURITYGUI::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from client
-    uiInterface.ThreadSafeMessageBox.disconnect(boost::bind(ThreadSafeMessageBox, this, _1, _2, _3));
+    m_handler_message_box->disconnect();
 }

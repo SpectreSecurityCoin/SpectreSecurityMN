@@ -1,12 +1,12 @@
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2020 The SPECTRESECURITY developers
+// Copyright (c) 2015-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "budget/finalizedbudget.h"
 
 #include "masternodeman.h"
-
+#include "validation.h"
 
 CFinalizedBudget::CFinalizedBudget() :
         fAutoChecked(false),
@@ -53,12 +53,12 @@ bool CFinalizedBudget::ParseBroadcast(CDataStream& broadcast)
 
 bool CFinalizedBudget::AddOrUpdateVote(const CFinalizedBudgetVote& vote, std::string& strError)
 {
-    const uint256& hash = vote.GetVin().prevout.GetHash();
+    const COutPoint& mnId = vote.GetVin().prevout;
     const int64_t voteTime = vote.GetTime();
     std::string strAction = "New vote inserted:";
 
-    if (mapVotes.count(hash)) {
-        const int64_t oldTime = mapVotes[hash].GetTime();
+    if (mapVotes.count(mnId)) {
+        const int64_t oldTime = mapVotes[mnId].GetTime();
         if (oldTime > voteTime) {
             strError = strprintf("new vote older than existing vote - %s\n", vote.GetHash().ToString());
             LogPrint(BCLog::MNBUDGET, "%s: %s\n", __func__, strError);
@@ -73,14 +73,7 @@ bool CFinalizedBudget::AddOrUpdateVote(const CFinalizedBudgetVote& vote, std::st
         strAction = "Existing vote updated:";
     }
 
-    if (voteTime > GetTime() + (60 * 60)) {
-        strError = strprintf("new vote is too far ahead of current time - %s - nTime %lli - Max Time %lli\n",
-                vote.GetHash().ToString(), voteTime, GetTime() + (60 * 60));
-        LogPrint(BCLog::MNBUDGET, "%s: %s\n", __func__, strError);
-        return false;
-    }
-
-    mapVotes[hash] = vote;
+    mapVotes[mnId] = vote;
     LogPrint(BCLog::MNBUDGET, "%s: %s %s\n", __func__, strAction.c_str(), vote.GetHash().ToString().c_str());
     return true;
 }
@@ -106,14 +99,6 @@ void CFinalizedBudget::SetSynced(bool synced)
         }
     }
 }
-
-// Sort budget proposals by hash
-struct sortProposalsByHash  {
-    bool operator()(const CBudgetProposal* left, const CBudgetProposal* right)
-    {
-        return (left->GetHash() < right->GetHash());
-    }
-};
 
 bool CFinalizedBudget::CheckProposals(const std::map<uint256, CBudgetProposal>& mapWinningProposals) const
 {
@@ -163,18 +148,6 @@ bool CFinalizedBudget::CheckProposals(const std::map<uint256, CBudgetProposal>& 
     return true;
 }
 
-// Remove votes from masternodes which are not valid/existent anymore
-void CFinalizedBudget::CleanAndRemove()
-{
-    std::map<uint256, CFinalizedBudgetVote>::iterator it = mapVotes.begin();
-
-    while (it != mapVotes.end()) {
-        CMasternode* pmn = mnodeman.Find(it->second.GetVin().prevout);
-        (*it).second.SetValid(pmn != nullptr);
-        ++it;
-    }
-}
-
 CAmount CFinalizedBudget::GetTotalPayout() const
 {
     CAmount ret = 0;
@@ -220,11 +193,11 @@ bool CFinalizedBudget::CheckStartEnd()
     }
 
     // The following 2 checks check the same (basically if vecBudgetPayments.size() > 100)
-    if (GetBlockEnd() - nBlockStart > 100) {
+    if (GetBlockEnd() - nBlockStart + 1 > (int) MAX_PROPOSALS_PER_CYCLE) {
         strInvalid = "Invalid BlockEnd";
         return false;
     }
-    if ((int)vecBudgetPayments.size() > 100) {
+    if ((int)vecBudgetPayments.size() > (int) MAX_PROPOSALS_PER_CYCLE) {
         strInvalid = "Invalid budget payments count (too many)";
         return false;
     }
@@ -253,14 +226,12 @@ bool CFinalizedBudget::CheckName()
     return true;
 }
 
-bool CFinalizedBudget::IsExpired(int nCurrentHeight)
+bool CFinalizedBudget::updateExpired(int nCurrentHeight)
 {
-    // Remove budgets after their last payment block
+    // Remove finalized budgets 2 * MAX_PROPOSALS_PER_CYCLE blocks after their end
     const int nBlockEnd = GetBlockEnd();
-    const int nBlocksPerCycle = Params().GetConsensus().nBudgetCycleBlocks;
-    const int nLastSuperBlock = nCurrentHeight - nCurrentHeight % nBlocksPerCycle;
-    if (nBlockEnd < nLastSuperBlock) {
-        strInvalid = strprintf("(ends at block %ld) too old and obsolete", nBlockEnd);
+    if (nCurrentHeight >= nBlockEnd + 2 * (int) MAX_PROPOSALS_PER_CYCLE) {
+        strInvalid = strprintf("(ends at block %ld) too old and obsolete (current %ld)", nBlockEnd, nCurrentHeight);
         return true;
     }
 
@@ -276,7 +247,7 @@ bool CFinalizedBudget::UpdateValid(int nCurrentHeight)
 {
     fValid = false;
 
-    if (IsExpired(nCurrentHeight)) {
+    if (updateExpired(nCurrentHeight)) {
         return false;
     }
 
@@ -285,11 +256,22 @@ bool CFinalizedBudget::UpdateValid(int nCurrentHeight)
     return true;
 }
 
+int CFinalizedBudget::GetVoteCount() const
+{
+    int ret = 0;
+    for (const auto& it : mapVotes) {
+        if (it.second.IsValid()) {
+            ret++;
+        }
+    }
+    return ret;
+}
+
 std::vector<uint256> CFinalizedBudget::GetVotesHashes() const
 {
     std::vector<uint256> vRet;
     for (const auto& it: mapVotes) {
-        vRet.push_back(it.first);
+        vRet.push_back(it.second.GetHash());
     }
     return vRet;
 }
@@ -329,8 +311,8 @@ bool CFinalizedBudget::IsPaidAlready(const uint256& nProposalHash, const uint256
     // -> reject transaction so it gets paid to a masternode instead
     if (nBlockHash != nPaidBlockHash) {
         LOCK(cs_main);
-        auto it = mapBlockIndex.find(nPaidBlockHash);
-        return it != mapBlockIndex.end() && chainActive.Contains(it->second);
+        CBlockIndex* pindex = LookupBlockIndex(nPaidBlockHash);
+        return pindex && chainActive.Contains(pindex);
     }
 
     // Re-checking same block. Not a double payment.
@@ -368,7 +350,7 @@ TrxValidationStatus CFinalizedBudget::IsTransactionValid(const CTransaction& txN
     // Search the payment
     const CScript& scriptExpected = vecBudgetPayments[nCurrentBudgetPayment].payee;
     const CAmount& amountExpected = vecBudgetPayments[nCurrentBudgetPayment].nAmount;
-    // Budget payment is usually the last output of coinstake txes, iterate backwords
+    // Budget payment is usually the last output of coinstake txes, iterate backwards
     for (auto out = txNew.vout.rbegin(); out != txNew.vout.rend(); ++out) {
         LogPrint(BCLog::MNBUDGET,"%s: nCurrentBudgetPayment=%d, payee=%s == out.scriptPubKey=%s, amount=%ld == out.nValue=%ld\n",
                 __func__, nCurrentBudgetPayment, HexStr(scriptExpected), HexStr(out->scriptPubKey), amountExpected, out->nValue);
@@ -425,7 +407,7 @@ bool CFinalizedBudget::operator>(const CFinalizedBudget& other) const
     const int count = GetVoteCount();
     const int otherCount = other.GetVoteCount();
 
-    if (count == otherCount) return GetFeeTXHash() > other.GetFeeTXHash();
+    if (count == otherCount) return UintToArith256(GetFeeTXHash()) > UintToArith256(other.GetFeeTXHash());
 
     return count > otherCount;
 }

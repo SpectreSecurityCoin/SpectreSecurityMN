@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2020 The SPECTRESECURITY developers
+// Copyright (c) 2015-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,8 +9,6 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "reverse_iterate.h"
-#include "uint256.h"
-#include "validation.h"
 
 #include <stdint.h>
 
@@ -44,10 +42,10 @@ bool CheckBlock(int nHeight, const uint256& hash, bool fMatchesCheckpoint)
 //! Guess how far we are in the verification process at the given block index
 double GuessVerificationProgress(const CBlockIndex* pindex, bool fSigchecks)
 {
-    if (pindex == NULL)
+    if (pindex == nullptr)
         return 0.0;
 
-    int64_t nNow = time(NULL);
+    int64_t nNow = time(nullptr);
 
     double fSigcheckVerificationFactor = fSigchecks ? SIGCHECK_VERIFICATION_FACTOR : 1.0;
     double fWorkBefore = 0.0; // Amount of work done before pindex
@@ -82,22 +80,6 @@ int GetTotalBlocksEstimate()
     const MapCheckpoints& checkpoints = *Params().Checkpoints().mapCheckpoints;
 
     return checkpoints.rbegin()->first;
-}
-
-CBlockIndex* GetLastCheckpoint()
-{
-    if (!fEnabled)
-        return NULL;
-
-    const MapCheckpoints& checkpoints = *Params().Checkpoints().mapCheckpoints;
-
-    for (const MapCheckpoints::value_type& i : reverse_iterate(checkpoints)) {
-        const uint256& hash = i.second;
-        BlockMap::const_iterator t = mapBlockIndex.find(hash);
-        if (t != mapBlockIndex.end())
-            return t->second;
-    }
-    return NULL;
 }
 
 } // namespace Checkpoints

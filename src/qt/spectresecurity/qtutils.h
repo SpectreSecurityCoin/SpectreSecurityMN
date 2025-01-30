@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -35,12 +35,12 @@ extern Qt::Modifier SHORT_KEY;
 bool openDialog(QDialog* widget, QWidget* gui);
 void closeDialog(QDialog* widget, SPECTRESECURITYGUI* gui);
 void openDialogFullScreen(QWidget* parent, QWidget* dialog);
-bool openDialogWithOpaqueBackgroundY(QDialog* widget, SPECTRESECURITYGUI* gui, double posX = 3, int posY = 5);
+bool openDialogWithOpaqueBackgroundY(QDialog* widget, SPECTRESECURITYGUI* gui, double posX = 3, int posY = 5, bool hideOpaqueBackground = true);
 bool openDialogWithOpaqueBackground(QDialog* widget, SPECTRESECURITYGUI* gui, double posX = 3);
 bool openDialogWithOpaqueBackgroundFullScreen(QDialog* widget, SPECTRESECURITYGUI* gui);
 
 //
-QPixmap encodeToQr(QString str, QString& errorStr, QColor qrColor = Qt::black);
+QPixmap encodeToQr(const QString& str, QString& errorStr, const QColor& qrColor = Qt::black);
 
 // Helpers
 void updateStyle(QWidget* widget);
@@ -58,7 +58,7 @@ void setupSettings(QSettings* settings);
 bool isLightTheme();
 void setTheme(bool isLight);
 
-void initComboBox(QComboBox* combo, QLineEdit* lineEdit = nullptr, QString cssClass = "btn-combo");
+void initComboBox(QComboBox* combo, QLineEdit* lineEdit = nullptr, QString cssClass = "btn-combo", bool setView = true);
 void fillAddressSortControls(SortEdit* seType, SortEdit* seOrder, QComboBox* boxType, QComboBox* boxOrder);
 void initCssEditLine(QLineEdit* edit, bool isDialog = false);
 void setCssEditLine(QLineEdit* edit, bool isValid, bool forceUpdate = false);
@@ -71,8 +71,8 @@ void setCssTitleScreen(QLabel* label);
 void setCssSubtitleScreen(QWidget* wid);
 void setCssTextBodyDialog(std::initializer_list<QWidget*> args);
 void setCssTextBodyDialog(QWidget* widget);
-void setCssProperty(std::initializer_list<QWidget*> args, QString value);
-void setCssProperty(QWidget* wid, QString value, bool forceUpdate = false);
+void setCssProperty(std::initializer_list<QWidget*> args, const QString& value);
+void setCssProperty(QWidget* wid, const QString& value, bool forceUpdate = false);
 void forceUpdateStyle(QWidget* widget, bool forceUpdate);
 void forceUpdateStyle(std::initializer_list<QWidget*> args);
 

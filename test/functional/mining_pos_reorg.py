@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019-2020 The SPECTRESECURITY developers
+# Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-from test_framework.authproxy import JSONRPCException
 from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
-    sync_blocks,
     assert_equal,
     assert_raises_rpc_error,
     connect_nodes,
@@ -20,7 +18,7 @@ class ReorgStakeTest(SpectresecurityTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 3
-        self.extra_args = [['-nuparams=PoS:201', '-nuparams=PoS_v2:201']] * self.num_nodes
+        self.extra_args = [['-nuparams=PoS:201', '-nuparams=PoS_v2:201', "-whitelist=127.0.0.1"]] * self.num_nodes
 
     def setup_chain(self):
         self.log.info("Initializing test directory " + self.options.tmpdir)
@@ -49,6 +47,7 @@ class ReorgStakeTest(SpectresecurityTestFramework):
 
     def get_tot_balance(self, nodeid):
         wi = self.nodes[nodeid].getwalletinfo()
+        assert_equal(self.nodes[nodeid].getblockcount(), wi['last_processed_block'])
         return wi['balance'] + wi['immature_balance']
 
     def check_money_supply(self, expected_ssmn):
@@ -69,7 +68,7 @@ class ReorgStakeTest(SpectresecurityTestFramework):
         # SSMN supply: block rewards
         expected_money_supply = 250.0 * 200
         self.check_money_supply(expected_money_supply)
-        block_time_0 = block_time_1 = self.mocktime
+        initial_time = self.mocktime
 
         # Check balances
         self.log.info("Checking balances...")
@@ -84,28 +83,26 @@ class ReorgStakeTest(SpectresecurityTestFramework):
         # Stake one block with node-0 and save the stake input
         self.log.info("Staking 1 block with node 0...")
         initial_unspent_0 = self.nodes[0].listunspent()
-        self.nodes[0].generate(1)
-        block_time_0 += 60
-        set_node_times(self.nodes, block_time_0)
+        self.mocktime = self.generate_pos(0, self.mocktime)
         last_block = self.nodes[0].getblock(self.nodes[0].getbestblockhash())
-        assert(len(last_block["tx"]) > 1)   # a PoS block has at least two txes
+        assert len(last_block["tx"]) > 1  # a PoS block has at least two txes
         coinstake_txid = last_block["tx"][1]
         coinstake_tx = self.nodes[0].getrawtransaction(coinstake_txid, True)
-        assert (coinstake_tx["vout"][0]["scriptPubKey"]["hex"] == "")  # first output of coinstake is empty
+        assert coinstake_tx["vout"][0]["scriptPubKey"]["hex"] == ""  # first output of coinstake is empty
         stakeinput = coinstake_tx["vin"][0]
 
         # The stake input was unspent 1 block ago, now it's not
         res, utxo = findUtxoInList(stakeinput["txid"], stakeinput["vout"], initial_unspent_0)
-        assert (res)
+        assert res
         res, utxo = findUtxoInList(stakeinput["txid"], stakeinput["vout"], self.nodes[0].listunspent())
-        assert (not res)
+        assert not res
         self.log.info("Coinstake input %s...%s-%d is no longer spendable." % (
             stakeinput["txid"][:9], stakeinput["txid"][-4:], stakeinput["vout"]))
 
         # Stake 10 more blocks with node-0 and check balances
         self.log.info("Staking 10 more blocks with node 0...")
         for i in range(10):
-            block_time_0 = self.generate_pos(0, block_time_0)
+            self.mocktime = self.generate_pos(0, self.mocktime)
         expected_balance_0 = initial_balance[0] + DecimalAmt(11 * 250.0)
         assert_equal(self.get_tot_balance(0), expected_balance_0)
         self.log.info("Balance for node 0 checks out.")
@@ -113,7 +110,7 @@ class ReorgStakeTest(SpectresecurityTestFramework):
         # Connect with node 2 and sync
         self.log.info("Reconnecting node 0 and node 2")
         connect_nodes(self.nodes[0], 2)
-        sync_blocks([self.nodes[i] for i in [0, 2]])
+        self.sync_blocks([self.nodes[i] for i in [0, 2]])
 
         # verify that the stakeinput can't be spent
         stakeinput_tx_json = self.nodes[0].getrawtransaction(stakeinput["txid"], True)
@@ -122,7 +119,7 @@ class ReorgStakeTest(SpectresecurityTestFramework):
             [{"txid": stakeinput["txid"], "vout": int(stakeinput["vout"])}],
             {"xxncEuJK27ygNh7imNfaX8JV6ZQUnoBqzN": (stakeinput_amount-0.01)})
         rawtx = self.nodes[0].signrawtransaction(rawtx_unsigned)
-        assert(rawtx["complete"])
+        assert rawtx["complete"]
         assert_raises_rpc_error(-25, "Missing inputs", self.nodes[0].sendrawtransaction, rawtx["hex"])
         txid = self.nodes[0].decoderawtransaction(rawtx["hex"])["txid"]
         assert_raises_rpc_error(-5, "No such mempool or blockchain transaction",
@@ -130,10 +127,11 @@ class ReorgStakeTest(SpectresecurityTestFramework):
         self.log.info("GOOD: spending the stake input was not possible.")
 
         # Stake 12 blocks with node-1
-        set_node_times(self.nodes, block_time_1)
+        self.mocktime = initial_time
+        set_node_times(self.nodes, self.mocktime)
         self.log.info("Staking 12 blocks with node 1...")
         for i in range(12):
-            block_time_1 = self.generate_pos(1, block_time_1)
+            self.mocktime = self.generate_pos(1, self.mocktime)
         expected_balance_1 = initial_balance[1] + DecimalAmt(12 * 250.0)
         assert_equal(self.get_tot_balance(1), expected_balance_1)
         self.log.info("Balance for node 1 checks out.")
@@ -141,9 +139,9 @@ class ReorgStakeTest(SpectresecurityTestFramework):
         # re-connect and sync nodes and check that node-0 and node-2 get on the other chain
         new_best_hash = self.nodes[1].getbestblockhash()
         self.log.info("Connecting and syncing nodes...")
-        set_node_times(self.nodes, block_time_1)
+        set_node_times(self.nodes, self.mocktime)
         connect_nodes_clique(self.nodes)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         for i in [0, 2]:
             assert_equal(self.nodes[i].getbestblockhash(), new_best_hash)
 
@@ -153,18 +151,19 @@ class ReorgStakeTest(SpectresecurityTestFramework):
 
         # check that NOW the original stakeinput is present and spendable
         res, utxo = findUtxoInList(stakeinput["txid"], stakeinput["vout"], self.nodes[0].listunspent())
-        assert (res and utxo["spendable"])
+        assert res and utxo["spendable"]
         self.log.info("Coinstake input %s...%s-%d is spendable again." % (
             stakeinput["txid"][:9], stakeinput["txid"][-4:], stakeinput["vout"]))
         self.nodes[0].sendrawtransaction(rawtx["hex"])
-        self.nodes[1].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_mempools()
+        self.mocktime = self.generate_pos(1, self.mocktime)
+        self.sync_blocks()
         res, utxo = findUtxoInList(stakeinput["txid"], stakeinput["vout"], self.nodes[0].listunspent())
-        assert (not res or not utxo["spendable"])
+        assert not res
 
-        # Verify that SSMN supply was properly updated after the reorgs
+        # Verify that SSMN supply was properly updated after the reorgs (including burned fee)
         self.log.info("Check SSMN supply...")
-        expected_money_supply += 250.0 * (self.nodes[1].getblockcount() - 200)
+        expected_money_supply += 250.0 * (self.nodes[1].getblockcount() - 200) - 0.01
         self.check_money_supply(expected_money_supply)
         self.log.info("Supply checks out.")
 

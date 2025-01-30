@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2013 The Bitcoin Core developers
-// Copyright (c) 2017-2020 The SPECTRESECURITY developers
+// Copyright (c) 2017-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,8 +23,7 @@ public:
     void Damage() {
         unsigned int n = InsecureRandRange(vHash.size());
         int bit = InsecureRandBits(8);
-        uint256 &hash = vHash[n];
-        hash ^= ((uint256)1 << bit);
+        *(vHash[n].begin() + (bit>>3)) ^= 1<<(bit&7);
     }
 };
 
@@ -41,7 +40,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
         CBlock block;
         for (unsigned int j=0; j<nTx; j++) {
             CMutableTransaction tx;
-            tx.nLockTime = rand(); // actual transaction data doesn't matter; just make the nLockTime's unique
+            tx.nLockTime = InsecureRand32(); // actual transaction data doesn't matter; just make the nLockTime's unique
             block.vtx.emplace_back(std::make_shared<const CTransaction>(tx));
         }
 

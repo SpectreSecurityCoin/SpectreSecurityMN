@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,8 +28,6 @@ protected:
 public Q_SLOTS:
     void onSignMessageButtonSMClicked();
     void onVerifyMessage();
-    void onPasteButtonSMClicked();
-    void onAddressBookButtonSMClicked();
     void onGoClicked();
     void onClearAll();
     void onAddressesClicked();

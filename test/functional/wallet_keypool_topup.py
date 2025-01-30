@@ -9,15 +9,17 @@ Two nodes. Node1 is under test. Node0 is providing transactions and generating b
 - Start node1, shutdown and backup wallet.
 - Generate 110 keys (enough to drain the keypool). Store key 90 (in the initial keypool) and key 110 (beyond the initial keypool). Send funds to key 90 and key 110.
 - Stop node1, clear the datadir, move wallet file back into the datadir and restart node1.
-- connect node1 to node0. Verify that they sync and node1 receives its funds."""
+- connect node1 to node0. Verify that they sync and node1 receives its funds.
+"""
+
 import shutil
 
 from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
     assert_equal,
     connect_nodes,
-    sync_blocks,
 )
+
 
 class KeypoolRestoreTest(SpectresecurityTestFramework):
     def set_test_params(self):
@@ -34,7 +36,7 @@ class KeypoolRestoreTest(SpectresecurityTestFramework):
 
         self.stop_node(1)
 
-        shutil.copyfile(self.tmpdir + "/node1/regtest/wallet.dat", self.tmpdir + "/wallet.bak")
+        shutil.copyfile(self.tmpdir + "/node1/regtest/wallets/wallet.dat", self.tmpdir + "/wallet.bak")
         self.start_node(1, self.extra_args[1])
         connect_nodes(self.nodes[0], 1)
 
@@ -51,13 +53,13 @@ class KeypoolRestoreTest(SpectresecurityTestFramework):
         self.nodes[0].generate(1)
         self.nodes[0].sendtoaddress(addr_extpool, 5)
         self.nodes[0].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
         self.log.info("Restart node with wallet backup")
 
         self.stop_node(1)
 
-        shutil.copyfile(self.tmpdir + "/wallet.bak", self.tmpdir + "/node1/regtest/wallet.dat")
+        shutil.copyfile(self.tmpdir + "/wallet.bak", self.tmpdir + "/node1/regtest/wallets/wallet.dat")
 
         self.log.info("Verify keypool is restored and balance is correct")
 
@@ -65,7 +67,7 @@ class KeypoolRestoreTest(SpectresecurityTestFramework):
         connect_nodes(self.nodes[0], 1)
         self.sync_all()
 
-        # wallet was not backupped after emptying the key pool.
+        # wallet was not backed-up after emptying the key pool.
         # Legacy wallet can't recover funds in addr_extpool
         recoveredBalance = 10 if isLegacyWallet else 15
         assert_equal(self.nodes[1].getbalance(), recoveredBalance)

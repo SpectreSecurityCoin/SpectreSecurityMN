@@ -1,14 +1,11 @@
 // Copyright (c) 2014-2016 The Dash developers
-// Copyright (c) 2016-2020 The SPECTRESECURITY developers
+// Copyright (c) 2016-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "spork.h"
 
-#include "messagesigner.h"
-#include "net.h"
 #include "netmessagemaker.h"
-#include "net_processing.h"
 #include "sporkdb.h"
 #include "validation.h"
 
@@ -17,16 +14,16 @@
 #define MAKE_SPORK_DEF(name, defaultValue) CSporkDef(name, defaultValue, #name)
 
 std::vector<CSporkDef> sporkDefs = {
-    MAKE_SPORK_DEF(SPORK_5_MAX_VALUE,                       1000),          // 1000 SSMN
     MAKE_SPORK_DEF(SPORK_8_MASTERNODE_PAYMENT_ENFORCEMENT,  4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_9_MASTERNODE_BUDGET_ENFORCEMENT,   4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_13_ENABLE_SUPERBLOCKS,             4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_14_NEW_PROTOCOL_ENFORCEMENT,       4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_15_NEW_PROTOCOL_ENFORCEMENT_2,     4070908800ULL), // OFF
-    MAKE_SPORK_DEF(SPORK_16_ZEROCOIN_MAINTENANCE_MODE,      4070908800ULL), // OFF
-    MAKE_SPORK_DEF(SPORK_18_ZEROCOIN_PUBLICSPEND_V4,        4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_19_COLDSTAKING_MAINTENANCE,        4070908800ULL), // OFF
     MAKE_SPORK_DEF(SPORK_20_SAPLING_MAINTENANCE,            4070908800ULL), // OFF
+    MAKE_SPORK_DEF(SPORK_21_LEGACY_MNS_MAX_HEIGHT,          4070908800ULL), // OFF
+    MAKE_SPORK_DEF(SPORK_22_LLMQ_DKG_MAINTENANCE,           4070908800ULL), // OFF
+    MAKE_SPORK_DEF(SPORK_23_CHAINLOCKS_ENFORCEMENT,         4070908800ULL), // OFF
 };
 
 CSporkManager sporkManager;
@@ -73,8 +70,8 @@ void CSporkManager::LoadSporksFromDB()
         }
 
         // add spork to memory
-        mapSporks[spork.GetHash()] = spork;
-        mapSporksActive[spork.nSporkID] = spork;
+        AddOrUpdateSporkMessage(spork);
+
         std::time_t result = spork.nValue;
         // If SPORK Value is greater than 1,000,000 assume it's actually a Date and then convert to a more readable format
         std::string sporkName = sporkManager.GetSporkNameByID(spork.nSporkID);
@@ -89,20 +86,16 @@ void CSporkManager::LoadSporksFromDB()
     }
 }
 
-void CSporkManager::ProcessSpork(CNode* pfrom, std::string& strCommand, CDataStream& vRecv)
+bool CSporkManager::ProcessSpork(CNode* pfrom, std::string& strCommand, CDataStream& vRecv, int& dosScore)
 {
-    if (fLiteMode) return; // disable all masternode related functionality
-
     if (strCommand == NetMsgType::SPORK) {
-        int banScore = ProcessSporkMsg(vRecv);
-        if (banScore > 0) {
-            LOCK(cs_main);
-            Misbehaving(pfrom->GetId(), banScore);
-        }
+        dosScore = ProcessSporkMsg(vRecv);
+        return dosScore == 0;
     }
     if (strCommand == NetMsgType::GETSPORKS) {
         ProcessGetSporks(pfrom, strCommand, vRecv);
     }
+    return true;
 }
 
 int CSporkManager::ProcessSporkMsg(CDataStream& vRecv)
@@ -120,64 +113,60 @@ int CSporkManager::ProcessSporkMsg(CSporkMessage& spork)
 
     // Do not accept sporks signed way too far into the future
     if (spork.nTimeSigned > GetAdjustedTime() + 2 * 60 * 60) {
-        LogPrint(BCLog::NET, "%s : ERROR: too far into the future\n", __func__);
+        LogPrint(BCLog::SPORKS, "%s : ERROR: too far into the future\n", __func__);
         return 100;
     }
 
     // reject old signature version
     if (spork.nMessVersion != MessageVersion::MESS_VER_HASH) {
-        LogPrint(BCLog::NET, "%s : nMessVersion=%d not accepted anymore\n", __func__, spork.nMessVersion);
+        LogPrint(BCLog::SPORKS, "%s : nMessVersion=%d not accepted anymore\n", __func__, spork.nMessVersion);
         return 0;
     }
 
-    uint256 hash = spork.GetHash();
     std::string sporkName = sporkManager.GetSporkNameByID(spork.nSporkID);
+    std::string strStatus;
     {
         LOCK(cs);
         if (mapSporksActive.count(spork.nSporkID)) {
             // spork is active
             if (mapSporksActive[spork.nSporkID].nTimeSigned >= spork.nTimeSigned) {
                 // spork in memory has been signed more recently
-                LogPrint(BCLog::NET, "%s : spork %d (%s) in memory is more recent: %d >= %d\n", __func__,
+                LogPrint(BCLog::SPORKS, "%s : spork %d (%s) in memory is more recent: %d >= %d\n", __func__,
                           spork.nSporkID, sporkName,
                           mapSporksActive[spork.nSporkID].nTimeSigned, spork.nTimeSigned);
                 return 0;
             } else {
                 // update active spork
-                LogPrint(BCLog::NET, "%s : got updated spork %d (%s) with value %d (signed at %d)\n", __func__,
-                          spork.nSporkID, sporkName, spork.nValue, spork.nTimeSigned);
+                strStatus = "updated";
             }
         } else {
             // spork is not active
-            LogPrint(BCLog::NET, "%s : got new spork %d (%s) with value %d (signed at %d)\n", __func__,
-                      spork.nSporkID, sporkName, spork.nValue, spork.nTimeSigned);
+            strStatus = "new";
         }
     }
 
     const bool fRequireNew = spork.nTimeSigned >= Params().GetConsensus().nTime_EnforceNewSporkKey;
-    bool fValidSig = spork.CheckSignature();
+    bool fValidSig = spork.CheckSignature(spork.GetPublicKey().GetID());
     if (!fValidSig && !fRequireNew) {
         // See if window is open that allows for old spork key to sign messages
         if (GetAdjustedTime() < Params().GetConsensus().nTime_RejectOldSporkKey) {
             CPubKey pubkeyold = spork.GetPublicKeyOld();
-            fValidSig = spork.CheckSignature(pubkeyold);
+            fValidSig = spork.CheckSignature(pubkeyold.GetID());
         }
     }
 
     if (!fValidSig) {
-        LogPrint(BCLog::NET, "%s : Invalid Signature\n", __func__);
+        LogPrint(BCLog::SPORKS, "%s : Invalid Signature\n", __func__);
         return 100;
     }
 
-    {
-        LOCK(cs);
-        mapSporks[hash] = spork;
-        mapSporksActive[spork.nSporkID] = spork;
-    }
+    // Log valid spork value change
+    LogPrintf("%s : got %s spork %d (%s) with value %d (signed at %d)\n", __func__,
+              strStatus, spork.nSporkID, sporkName, spork.nValue, spork.nTimeSigned);
+
+    AddOrUpdateSporkMessage(spork, true);
     spork.Relay();
 
-    // SPECTRESECURITY: add to spork database.
-    pSporkDB->WriteSpork(spork.nSporkID, spork);
     // All good.
     return 0;
 }
@@ -203,17 +192,28 @@ void CSporkManager::ProcessGetSporks(CNode* pfrom, std::string& strCommand, CDat
 
 bool CSporkManager::UpdateSpork(SporkId nSporkID, int64_t nValue)
 {
-    CSporkMessage spork = CSporkMessage(nSporkID, nValue, GetTime());
+    CSporkMessage spork(nSporkID, nValue, GetTime());
 
-    if(spork.Sign(strMasterPrivKey)){
+    if (spork.Sign(strMasterPrivKey)) {
         spork.Relay();
-        LOCK(cs);
-        mapSporks[spork.GetHash()] = spork;
-        mapSporksActive[nSporkID] = spork;
+        AddOrUpdateSporkMessage(spork, true);
         return true;
     }
 
     return false;
+}
+
+void CSporkManager::AddOrUpdateSporkMessage(const CSporkMessage& spork, bool flush)
+{
+    {
+        LOCK(cs);
+        mapSporks[spork.GetHash()] = spork;
+        mapSporksActive[spork.nSporkID] = spork;
+    }
+    if (flush) {
+        // add to spork database.
+        pSporkDB->WriteSpork(spork.nSporkID, spork);
+    }
 }
 
 // grab the spork value, and see if it's off
@@ -256,7 +256,7 @@ std::string CSporkManager::GetSporkNameByID(SporkId nSporkID)
 {
     auto it = sporkDefsById.find(nSporkID);
     if (it == sporkDefsById.end()) {
-        LogPrint(BCLog::NET, "%s : Unknown Spork ID %d\n", __func__, nSporkID);
+        LogPrint(BCLog::SPORKS, "%s : Unknown Spork ID %d\n", __func__, nSporkID);
         return "Unknown";
     }
     return it->second->name;
@@ -268,12 +268,12 @@ bool CSporkManager::SetPrivKey(std::string strPrivKey)
 
     spork.Sign(strPrivKey);
 
-    bool fValidSig = spork.CheckSignature();
+    bool fValidSig = spork.CheckSignature(spork.GetPublicKey().GetID());
     if (!fValidSig) {
         // See if window is open that allows for old spork key to sign messages
         if (GetAdjustedTime() < Params().GetConsensus().nTime_RejectOldSporkKey) {
             CPubKey pubkeyold = spork.GetPublicKeyOld();
-            fValidSig = spork.CheckSignature(pubkeyold);
+            fValidSig = spork.CheckSignature(pubkeyold.GetID());
         }
     }
     if (fValidSig) {
@@ -310,7 +310,7 @@ std::string CSporkMessage::GetStrMessage() const
             std::to_string(nTimeSigned);
 }
 
-const CPubKey CSporkMessage::GetPublicKey(std::string& strErrorRet) const
+const CPubKey CSporkMessage::GetPublicKey() const
 {
     return CPubKey(ParseHex(Params().GetConsensus().strSporkPubKey));
 }

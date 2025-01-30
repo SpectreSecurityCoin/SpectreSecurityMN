@@ -1,5 +1,5 @@
 // Copyright (c) 2014 The Bitcoin Core developers
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,7 +20,7 @@
 #include <boost/test/unit_test.hpp>
 
 int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out);
-void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight);
+void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight, bool fSkipInvalid = false);
 
 namespace
 {
@@ -172,7 +172,7 @@ public:
 class TxWithNullifiers
 {
 public:
-    CTransaction tx;
+    CTransactionRef tx;
     uint256 saplingNullifier;
 
     TxWithNullifiers()
@@ -183,7 +183,7 @@ public:
         SpendDescription sd;
         sd.nullifier = saplingNullifier;
         mutableTx.sapData->vShieldedSpend.push_back(sd);
-        tx = CTransaction(mutableTx);
+        tx = MakeTransactionRef(CTransaction(mutableTx));
     }
 };
 
@@ -200,8 +200,8 @@ public:
                      memusage::DynamicUsage(cacheSaplingAnchors) +
                      memusage::DynamicUsage(cacheSaplingNullifiers);
         size_t count = 0;
-        for (CCoinsMap::iterator it = cacheCoins.begin(); it != cacheCoins.end(); it++) {
-            ret += memusage::DynamicUsage(it->second.coin);
+        for (const auto& entry : cacheCoins) {
+            ret += memusage::DynamicUsage(entry.second.coin);
             ++count;
         }
         BOOST_CHECK_EQUAL(GetCacheSize(), count);
@@ -235,12 +235,12 @@ BOOST_AUTO_TEST_CASE(nullifier_regression_test)
     TxWithNullifiers txWithNullifiers;
 
     // Insert a nullifier into the base.
-    cache1.SetNullifiers(txWithNullifiers.tx, true);
+    cache1.SetNullifiers(*txWithNullifiers.tx, true);
     checkNullifierCache(cache1, txWithNullifiers, true);
     cache1.Flush(); // Flush to base.
 
     // Remove the nullifier from cache
-    cache1.SetNullifiers(txWithNullifiers.tx, false);
+    cache1.SetNullifiers(*txWithNullifiers.tx, false);
 
     // The nullifier now should be `false`.
     checkNullifierCache(cache1, txWithNullifiers, false);
@@ -254,12 +254,12 @@ BOOST_AUTO_TEST_CASE(nullifier_regression_test)
         TxWithNullifiers txWithNullifiers;
 
         // Insert a nullifier into the base.
-        cache1.SetNullifiers(txWithNullifiers.tx, true);
+        cache1.SetNullifiers(*txWithNullifiers.tx, true);
         checkNullifierCache(cache1, txWithNullifiers, true);
         cache1.Flush(); // Flush to base.
 
         // Remove the nullifier from cache
-        cache1.SetNullifiers(txWithNullifiers.tx, false);
+        cache1.SetNullifiers(*txWithNullifiers.tx, false);
         cache1.Flush(); // Flush to base.
 
         // The nullifier now should be `false`.
@@ -273,7 +273,7 @@ BOOST_AUTO_TEST_CASE(nullifier_regression_test)
 
         // Insert a nullifier into the base.
         TxWithNullifiers txWithNullifiers;
-        cache1.SetNullifiers(txWithNullifiers.tx, true);
+        cache1.SetNullifiers(*txWithNullifiers.tx, true);
         checkNullifierCache(cache1, txWithNullifiers, true);
         cache1.Flush(); // Empties cache.
 
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(nullifier_regression_test)
             // Remove the nullifier.
             CCoinsViewCache cache2(&cache1);
             checkNullifierCache(cache2, txWithNullifiers, true);
-            cache1.SetNullifiers(txWithNullifiers.tx, false);
+            cache1.SetNullifiers(*txWithNullifiers.tx, false);
             cache2.Flush(); // Empties cache, flushes to cache1.
         }
 
@@ -297,14 +297,14 @@ BOOST_AUTO_TEST_CASE(nullifier_regression_test)
 
         // Insert a nullifier into the base.
         TxWithNullifiers txWithNullifiers;
-        cache1.SetNullifiers(txWithNullifiers.tx, true);
+        cache1.SetNullifiers(*txWithNullifiers.tx, true);
         cache1.Flush(); // Empties cache.
 
         // Create cache on top.
         {
             // Remove the nullifier.
             CCoinsViewCache cache2(&cache1);
-            cache2.SetNullifiers(txWithNullifiers.tx, false);
+            cache2.SetNullifiers(*txWithNullifiers.tx, false);
             cache2.Flush(); // Empties cache, flushes to cache1.
         }
 
@@ -485,14 +485,14 @@ BOOST_AUTO_TEST_CASE(nullifiers_test)
 
     TxWithNullifiers txWithNullifiers;
     checkNullifierCache(cache, txWithNullifiers, false);
-    cache.SetNullifiers(txWithNullifiers.tx, true);
+    cache.SetNullifiers(*txWithNullifiers.tx, true);
     checkNullifierCache(cache, txWithNullifiers, true);
     cache.Flush();
 
     CCoinsViewCache cache2(&base);
 
     checkNullifierCache(cache2, txWithNullifiers, true);
-    cache2.SetNullifiers(txWithNullifiers.tx, false);
+    cache2.SetNullifiers(*txWithNullifiers.tx, false);
     checkNullifierCache(cache2, txWithNullifiers, false);
     cache2.Flush();
 
@@ -690,15 +690,15 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
 
         // Once every 1000 iterations and at the end, verify the full cache.
         if (InsecureRandRange(1000) == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (auto it = result.begin(); it != result.end(); it++) {
-                bool have = stack.back()->HaveCoin(it->first);
-                const Coin& coin = stack.back()->AccessCoin(it->first);
+            for (const auto& entry : result) {
+                bool have = stack.back()->HaveCoin(entry.first);
+                const Coin& coin = stack.back()->AccessCoin(entry.first);
                 BOOST_CHECK(have == !coin.IsSpent());
-                BOOST_CHECK(coin == it->second);
+                BOOST_CHECK(coin == entry.second);
                 if (coin.IsSpent()) {
                     missed_an_entry = true;
                 } else {
-                    BOOST_CHECK(stack.back()->HaveCoinInCache(it->first));
+                    BOOST_CHECK(stack.back()->HaveCoinInCache(entry.first));
                     found_an_entry = true;
                 }
             }
@@ -895,11 +895,11 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
 
         // Once every 1000 iterations and at the end, verify the full cache.
         if (InsecureRandRange(1000) == 1 || i == NUM_SIMULATION_ITERATIONS - 1) {
-            for (auto it = result.begin(); it != result.end(); it++) {
-                bool have = stack.back()->HaveCoin(it->first);
-                const Coin& coin = stack.back()->AccessCoin(it->first);
+            for (const auto& entry : result) {
+                bool have = stack.back()->HaveCoin(entry.first);
+                const Coin& coin = stack.back()->AccessCoin(entry.first);
                 BOOST_CHECK(have == !coin.IsSpent());
-                BOOST_CHECK(coin == it->second);
+                BOOST_CHECK(coin == entry.second);
             }
         }
 
@@ -985,7 +985,7 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
     CDataStream tmp(SER_DISK, CLIENT_VERSION);
     uint64_t x = 3000000000ULL;
     tmp << VARINT(x);
-    BOOST_CHECK_EQUAL(HexStr(tmp.begin(), tmp.end()), "8a95c0bb00");
+    BOOST_CHECK_EQUAL(HexStr(tmp), "8a95c0bb00");
     CDataStream ss5(ParseHex("00008a95c0bb00"), SER_DISK, CLIENT_VERSION);
     try {
         Coin cc5;

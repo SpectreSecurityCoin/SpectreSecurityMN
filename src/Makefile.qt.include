@@ -9,14 +9,12 @@ EXTRA_LIBRARIES += qt/libbitcoinqt.a
 include Makefile.qt_locale.include
 
 QT_FORMS_UI = \
-  qt/forms/addressbookpage.ui \
   qt/forms/askpassphrasedialog.ui \
   qt/forms/coincontroldialog.ui \
   qt/forms/editaddressdialog.ui \
   qt/forms/helpmessagedialog.ui \
   qt/forms/intro.ui \
   qt/forms/openuridialog.ui \
-  qt/forms/optionsdialog.ui \
   qt/forms/rpcconsole.ui \
   qt/spectresecurity/forms/loadingdialog.ui \
   qt/spectresecurity/forms/snackbar.ui \
@@ -43,7 +41,6 @@ QT_FORMS_UI = \
   qt/spectresecurity/forms/sendcustomfeedialog.ui \
   qt/spectresecurity/forms/sendmultirow.ui \
   qt/spectresecurity/forms/send.ui \
-  qt/spectresecurity/forms/addnewaddressdialog.ui \
   qt/spectresecurity/forms/addnewcontactdialog.ui \
   qt/spectresecurity/forms/requestdialog.ui \
   qt/spectresecurity/forms/receivewidget.ui \
@@ -51,6 +48,12 @@ QT_FORMS_UI = \
   qt/spectresecurity/forms/addresseswidget.ui \
   qt/spectresecurity/forms/defaultdialog.ui \
   qt/spectresecurity/forms/coldstakingwidget.ui \
+  qt/spectresecurity/forms/proposalcard.ui \
+  qt/spectresecurity/forms/mnselectiondialog.ui \
+  qt/spectresecurity/forms/votedialog.ui \
+  qt/spectresecurity/forms/createproposaldialog.ui \
+  qt/spectresecurity/forms/proposalinfodialog.ui \
+  qt/spectresecurity/forms/governancewidget.ui \
   qt/spectresecurity/settings/forms/settingsbackupwallet.ui \
   qt/spectresecurity/settings/forms/settingsexportcsv.ui \
   qt/spectresecurity/settings/forms/settingsbittoolwidget.ui \
@@ -59,8 +62,6 @@ QT_FORMS_UI = \
   qt/spectresecurity/settings/forms/settingsfaqwidget.ui \
   qt/spectresecurity/settings/forms/settingsinformationwidget.ui \
   qt/spectresecurity/settings/forms/settingsmainoptionswidget.ui \
-  qt/spectresecurity/settings/forms/settingsmultisenddialog.ui \
-  qt/spectresecurity/settings/forms/settingsmultisendwidget.ui \
   qt/spectresecurity/settings/forms/settingssignmessagewidgets.ui \
   qt/spectresecurity/settings/forms/settingswalletoptionswidget.ui \
   qt/spectresecurity/settings/forms/settingswalletrepairwidget.ui \
@@ -69,7 +70,6 @@ QT_FORMS_UI = \
   qt/spectresecurity/forms/splash.ui
 
 QT_MOC_CPP = \
-  qt/moc_addressbookpage.cpp \
   qt/moc_addresstablemodel.cpp \
   qt/moc_askpassphrasedialog.cpp \
   qt/moc_bantablemodel.cpp \
@@ -87,14 +87,13 @@ QT_MOC_CPP = \
   qt/moc_macnotificationhandler.cpp \
   qt/moc_notificator.cpp \
   qt/moc_openuridialog.cpp \
-  qt/moc_optionsdialog.cpp \
   qt/moc_optionsmodel.cpp \
   qt/moc_peertablemodel.cpp \
   qt/moc_paymentserver.cpp \
   qt/moc_qvalidatedlineedit.cpp \
   qt/moc_qvaluecombobox.cpp \
-  qt/moc_recentrequeststablemodel.cpp \
   qt/moc_rpcconsole.cpp \
+  qt/moc_rpcexecutor.cpp \
   qt/moc_trafficgraphwidget.cpp \
   qt/moc_transactionfilterproxy.cpp \
   qt/moc_transactiontablemodel.cpp \
@@ -131,7 +130,6 @@ QT_MOC_CPP = \
   qt/spectresecurity/moc_sendmemodialog.cpp \
   qt/spectresecurity/moc_sendmultirow.cpp \
   qt/spectresecurity/moc_send.cpp \
-  qt/spectresecurity/moc_addnewaddressdialog.cpp \
   qt/spectresecurity/moc_addnewcontactdialog.cpp \
   qt/spectresecurity/moc_requestdialog.cpp \
   qt/spectresecurity/moc_receivewidget.cpp \
@@ -139,6 +137,12 @@ QT_MOC_CPP = \
   qt/spectresecurity/moc_addresseswidget.cpp \
   qt/spectresecurity/moc_defaultdialog.cpp \
   qt/spectresecurity/moc_coldstakingwidget.cpp \
+  qt/spectresecurity/moc_proposalcard.cpp \
+  qt/spectresecurity/moc_mnselectiondialog.cpp \
+  qt/spectresecurity/moc_votedialog.cpp \
+  qt/spectresecurity/moc_createproposaldialog.cpp \
+  qt/spectresecurity/moc_proposalinfodialog.cpp \
+  qt/spectresecurity/moc_governancewidget.cpp \
   qt/spectresecurity/settings/moc_settingsbackupwallet.cpp \
   qt/spectresecurity/settings/moc_settingsexportcsv.cpp \
   qt/spectresecurity/settings/moc_settingsbittoolwidget.cpp \
@@ -147,8 +151,6 @@ QT_MOC_CPP = \
   qt/spectresecurity/settings/moc_settingsfaqwidget.cpp \
   qt/spectresecurity/settings/moc_settingsinformationwidget.cpp \
   qt/spectresecurity/settings/moc_settingsmainoptionswidget.cpp \
-  qt/spectresecurity/settings/moc_settingsmultisenddialog.cpp \
-  qt/spectresecurity/settings/moc_settingsmultisendwidget.cpp \
   qt/spectresecurity/settings/moc_settingssignmessagewidgets.cpp \
   qt/spectresecurity/settings/moc_settingswalletoptionswidget.cpp \
   qt/spectresecurity/settings/moc_settingswalletrepairwidget.cpp \
@@ -162,21 +164,14 @@ BITCOIN_MM = \
 
 QT_MOC = \
   qt/spectresecurity.moc \
-  qt/intro.moc \
-  qt/rpcconsole.moc \
-  qt/spectresecurity/settings/moc_settingsconsolewidget.cpp
+  qt/intro.moc
 
 QT_QRC_CPP = qt/qrc_spectresecurity.cpp
 QT_QRC = qt/spectresecurity.qrc
 QT_QRC_LOCALE_CPP = qt/qrc_spectresecurity_locale.cpp
 QT_QRC_LOCALE = qt/spectresecurity_locale.qrc
 
-PROTOBUF_CC = qt/paymentrequest.pb.cc
-PROTOBUF_H = qt/paymentrequest.pb.h
-PROTOBUF_PROTO = qt/paymentrequest.proto
-
 BITCOIN_QT_H = \
-  qt/addressbookpage.h \
   qt/addresstablemodel.h \
   qt/askpassphrasedialog.h \
   qt/bantablemodel.h \
@@ -196,16 +191,13 @@ BITCOIN_QT_H = \
   qt/networkstyle.h \
   qt/notificator.h \
   qt/openuridialog.h \
-  qt/optionsdialog.h \
   qt/optionsmodel.h \
-  qt/paymentrequestplus.h \
   qt/paymentserver.h \
   qt/peertablemodel.h \
-  qt/platformstyle.h \
   qt/qvalidatedlineedit.h \
   qt/qvaluecombobox.h \
-  qt/recentrequeststablemodel.h \
   qt/rpcconsole.h \
+  qt/rpcexecutor.h \
   qt/trafficgraphwidget.h \
   qt/transactionfilterproxy.h \
   qt/transactionrecord.h \
@@ -253,7 +245,6 @@ BITCOIN_QT_H = \
   qt/spectresecurity/sendmemodialog.h \
   qt/spectresecurity/sendmultirow.h \
   qt/spectresecurity/send.h \
-  qt/spectresecurity/addnewaddressdialog.h \
   qt/spectresecurity/addnewcontactdialog.h \
   qt/spectresecurity/requestdialog.h \
   qt/spectresecurity/receivewidget.h \
@@ -261,6 +252,13 @@ BITCOIN_QT_H = \
   qt/spectresecurity/addresseswidget.h \
   qt/spectresecurity/defaultdialog.h \
   qt/spectresecurity/coldstakingwidget.h \
+  qt/spectresecurity/governancemodel.h \
+  qt/spectresecurity/proposalcard.h \
+  qt/spectresecurity/mnselectiondialog.h \
+  qt/spectresecurity/votedialog.h \
+  qt/spectresecurity/createproposaldialog.h \
+  qt/spectresecurity/proposalinfodialog.h \
+  qt/spectresecurity/governancewidget.h \
   qt/spectresecurity/settings/settingsbackupwallet.h \
   qt/spectresecurity/settings/settingsexportcsv.h \
   qt/spectresecurity/settings/settingsbittoolwidget.h \
@@ -269,8 +267,6 @@ BITCOIN_QT_H = \
   qt/spectresecurity/settings/settingsfaqwidget.h \
   qt/spectresecurity/settings/settingsinformationwidget.h \
   qt/spectresecurity/settings/settingsmainoptionswidget.h \
-  qt/spectresecurity/settings/settingsmultisenddialog.h \
-  qt/spectresecurity/settings/settingsmultisendwidget.h \
   qt/spectresecurity/settings/settingssignmessagewidgets.h \
   qt/spectresecurity/settings/settingswalletoptionswidget.h \
   qt/spectresecurity/settings/settingswalletrepairwidget.h \
@@ -434,6 +430,7 @@ RES_ICONS = \
   qt/spectresecurity/res/img/ic-switch-on.svg \
   qt/spectresecurity/res/img/img-qr-test.png \
   qt/spectresecurity/res/img/ic-check-box.svg \
+  qt/spectresecurity/res/img/ic-check-box-light.svg \
   qt/spectresecurity/res/img/ic-check-box-dark-active.svg \
   qt/spectresecurity/res/img/ic-check-box-indeterminate.svg \
   qt/spectresecurity/res/img/ic-check-box-liliac-indeterminate.svg \
@@ -452,7 +449,9 @@ RES_ICONS = \
   qt/spectresecurity/res/img/ic-check-tor.svg \
   qt/spectresecurity/res/img/ic-label.svg \
   qt/spectresecurity/res/img/ic-transaction-received.svg \
+  qt/spectresecurity/res/img/ic-transaction-received-memo.svg \
   qt/spectresecurity/res/img/dark/ic-transaction-received.svg \
+  qt/spectresecurity/res/img/dark/ic-transaction-received-memo.svg \
   qt/spectresecurity/res/img/dark/ic-transaction-warning.svg \
   qt/spectresecurity/res/img/dark/ic-transaction-mint.svg \
   qt/spectresecurity/res/img/dark/ic-transaction-mint-inactive.svg \
@@ -498,7 +497,21 @@ RES_ICONS = \
   qt/spectresecurity/res/img/ic-information.svg \
   qt/spectresecurity/res/img/ic-information-hover.svg \
   qt/spectresecurity/res/img/ani-loading-dark.gif \
-  qt/spectresecurity/res/img/ani-loading.gif
+  qt/spectresecurity/res/img/ani-loading.gif \
+  qt/spectresecurity/res/img/ic-check-vote.svg \
+  qt/spectresecurity/res/img/ic-check-vote-active.svg \
+  qt/spectresecurity/res/img/ic-check-vote-dark.svg \
+  qt/spectresecurity/res/img/ic-check-vote-active-dark.svg \
+  qt/spectresecurity/res/img/ic-check-block.svg \
+  qt/spectresecurity/res/img/ic-filter.svg \
+  qt/spectresecurity/res/img/ic-link.svg \
+  qt/spectresecurity/res/img/ic-nav-governance.svg \
+  qt/spectresecurity/res/img/ic-nav-governance-active.svg \
+  qt/spectresecurity/res/img/ic-nav-governance-hover.svg \
+  qt/spectresecurity/res/img/ic-time.svg \
+  qt/spectresecurity/res/img/ic-link-hover.svg \
+  qt/spectresecurity/res/img/img-empty-governance.svg \
+  qt/spectresecurity/res/img/img-empty-dark-governance.svg
 
 BITCOIN_QT_BASE_CPP = \
   qt/bantablemodel.cpp \
@@ -511,29 +524,25 @@ BITCOIN_QT_BASE_CPP = \
   qt/intro.cpp \
   qt/networkstyle.cpp \
   qt/notificator.cpp \
-  qt/optionsdialog.cpp \
   qt/optionsmodel.cpp \
   qt/peertablemodel.cpp \
-  qt/platformstyle.cpp \
   qt/qvalidatedlineedit.cpp \
   qt/qvaluecombobox.cpp \
   qt/rpcconsole.cpp \
+  qt/rpcexecutor.cpp \
   qt/trafficgraphwidget.cpp \
   qt/utilitydialog.cpp
 
 BITCOIN_QT_WINDOWS_CPP = qt/winshutdownmonitor.cpp
 
 BITCOIN_QT_WALLET_CPP = \
-  qt/addressbookpage.cpp \
   qt/addresstablemodel.cpp \
   qt/askpassphrasedialog.cpp \
   qt/coincontroldialog.cpp \
   qt/coincontroltreewidget.cpp \
   qt/editaddressdialog.cpp \
   qt/openuridialog.cpp \
-  qt/paymentrequestplus.cpp \
   qt/paymentserver.cpp \
-  qt/recentrequeststablemodel.cpp \
   qt/transactionfilterproxy.cpp \
   qt/transactionrecord.cpp \
   qt/transactiontablemodel.cpp \
@@ -575,7 +584,6 @@ BITCOIN_QT_WALLET_CPP = \
   qt/spectresecurity/sendmemodialog.cpp \
   qt/spectresecurity/sendmultirow.cpp \
   qt/spectresecurity/send.cpp \
-  qt/spectresecurity/addnewaddressdialog.cpp \
   qt/spectresecurity/addnewcontactdialog.cpp \
   qt/spectresecurity/requestdialog.cpp \
   qt/spectresecurity/receivewidget.cpp \
@@ -583,6 +591,13 @@ BITCOIN_QT_WALLET_CPP = \
   qt/spectresecurity/addresseswidget.cpp \
   qt/spectresecurity/defaultdialog.cpp \
   qt/spectresecurity/coldstakingwidget.cpp \
+  qt/spectresecurity/governancemodel.cpp \
+  qt/spectresecurity/proposalcard.cpp \
+  qt/spectresecurity/mnselectiondialog.cpp \
+  qt/spectresecurity/votedialog.cpp \
+  qt/spectresecurity/createproposaldialog.cpp \
+  qt/spectresecurity/proposalinfodialog.cpp \
+  qt/spectresecurity/governancewidget.cpp \
   qt/spectresecurity/settings/settingsbackupwallet.cpp \
   qt/spectresecurity/settings/settingsexportcsv.cpp \
   qt/spectresecurity/settings/settingsbittoolwidget.cpp \
@@ -591,8 +606,6 @@ BITCOIN_QT_WALLET_CPP = \
   qt/spectresecurity/settings/settingsfaqwidget.cpp \
   qt/spectresecurity/settings/settingsinformationwidget.cpp \
   qt/spectresecurity/settings/settingsmainoptionswidget.cpp \
-  qt/spectresecurity/settings/settingsmultisenddialog.cpp \
-  qt/spectresecurity/settings/settingsmultisendwidget.cpp \
   qt/spectresecurity/settings/settingssignmessagewidgets.cpp \
   qt/spectresecurity/settings/settingswalletoptionswidget.cpp \
   qt/spectresecurity/settings/settingswalletrepairwidget.cpp \
@@ -626,15 +639,14 @@ BITCOIN_QT_INCLUDES = -I$(builddir)/qt -I$(srcdir)/qt -I$(srcdir)/qt/forms \
   -I$(builddir)/qt/forms -DQT_NO_KEYWORDS
 
 qt_libbitcoinqt_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
-  $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
+  $(QT_INCLUDES) $(QT_DBUS_INCLUDES) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
 qt_libbitcoinqt_a_CXXFLAGS = $(AM_CXXFLAGS) $(QT_PIE_FLAGS)
 qt_libbitcoinqt_a_OBJCXXFLAGS = $(AM_OBJCXXFLAGS) $(QT_PIE_FLAGS)
 
 qt_libbitcoinqt_a_SOURCES = $(BITCOIN_QT_CPP) $(BITCOIN_QT_H) $(QT_FORMS_UI) \
-  $(QT_QRC) $(QT_QRC_LOCALE) $(QT_TS) $(PROTOBUF_PROTO) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS)
+  $(QT_QRC) $(QT_QRC_LOCALE) $(QT_TS) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS)
 
-nodist_qt_libbitcoinqt_a_SOURCES = $(QT_MOC_CPP) $(QT_MOC) $(PROTOBUF_CC) \
-  $(PROTOBUF_H) $(QT_QRC_CPP) $(QT_QRC_LOCALE_CPP)
+nodist_qt_libbitcoinqt_a_SOURCES = $(QT_MOC_CPP) $(QT_MOC) $(QT_QRC_CPP) $(QT_QRC_LOCALE_CPP)
 
 # forms/foo.h -> forms/ui_foo.h
 QT_FORMS_H=$(join $(dir $(QT_FORMS_UI)),$(addprefix ui_, $(notdir $(QT_FORMS_UI:.ui=.h))))
@@ -644,14 +656,9 @@ QT_FORMS_H=$(join $(dir $(QT_FORMS_UI)),$(addprefix ui_, $(notdir $(QT_FORMS_UI:
 $(QT_MOC): $(QT_FORMS_H)
 $(qt_libbitcoinqt_a_OBJECTS) $(qt_spectresecurity_qt_OBJECTS) : | $(QT_MOC)
 
-#Generating these with a half-written protobuf header leads to wacky results.
-#This makes sure it's done.
-$(QT_MOC): $(PROTOBUF_H)
-$(QT_MOC_CPP): $(PROTOBUF_H)
-
 # spectresecurity-qt binary #
 qt_spectresecurity_qt_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BITCOIN_QT_INCLUDES) \
-  $(QT_INCLUDES) $(PROTOBUF_CFLAGS) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
+  $(QT_INCLUDES) $(QR_CFLAGS) $(SVG_CFLAGS) $(CHARTS_CFLAGS)
 qt_spectresecurity_qt_CXXFLAGS = $(AM_CXXFLAGS) $(QT_PIE_FLAGS)
 
 qt_spectresecurity_qt_SOURCES = qt/spectresecurity.cpp
@@ -669,8 +676,8 @@ if ENABLE_ZMQ
 qt_spectresecurity_qt_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)
 endif
 qt_spectresecurity_qt_LDADD += $(LIBBITCOIN_CLI) $(LIBBITCOIN_COMMON) $(LIBBITCOIN_UTIL) $(LIBBITCOIN_CRYPTO) $(LIBUNIVALUE) $(LIBBITCOIN_ZEROCOIN) $(LIBSAPLING) $(LIBRUSTZCASH) $(LIBZCASH_LIBS) $(LIBLEVELDB) $(LIBLEVELDB_SSE42) $(LIBMEMENV) \
-  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(PROTOBUF_LIBS) $(SVG_LIBS) $(CHARTS_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(LIBSECP256K1) \
-  $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+  $(BOOST_LIBS) $(QT_LIBS) $(QT_DBUS_LIBS) $(QR_LIBS) $(SVG_LIBS) $(CHARTS_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(NATPMP_LIBS) $(LIBSECP256K1) \
+  $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(BLS_LIBS)
 qt_spectresecurity_qt_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(QT_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 qt_spectresecurity_qt_LIBTOOLFLAGS = $(AM_LIBTOOLFLAGS) --tag CXX
 
@@ -681,7 +688,7 @@ SECONDARY: $(QT_QM)
 
 $(srcdir)/qt/spectresecuritystrings.cpp: $(libbitcoin_server_a_SOURCES) $(libbitcoin_wallet_a_SOURCES) $(libbitcoin_common_a_SOURCES) $(libbitcoin_zmq_a_SOURCES) $(libbitcoin_util_a_SOURCES)
 	@test -n $(XGETTEXT) || echo "xgettext is required for updating translations"
-	$(AM_V_GEN) cd $(srcdir); XGETTEXT=$(XGETTEXT) PACKAGE_NAME="$(PACKAGE_NAME)" $(PYTHON) ../share/qt/extract_strings_qt.py $^
+	$(AM_V_GEN) cd $(srcdir); XGETTEXT=$(XGETTEXT) $(PYTHON) ../share/qt/extract_strings_qt.py $^
 
 translate: $(srcdir)/qt/spectresecuritystrings.cpp $(QT_FORMS_UI) $(QT_FORMS_UI) $(BITCOIN_QT_BASE_CPP) qt/spectresecurity.cpp $(BITCOIN_QT_WINDOWS_CPP) $(BITCOIN_QT_WALLET_CPP) $(BITCOIN_QT_H) $(BITCOIN_MM)
 	@test -n $(LUPDATE) || echo "lupdate is required for updating translations"
@@ -694,7 +701,7 @@ $(QT_QRC_LOCALE_CPP): $(QT_QRC_LOCALE) $(QT_QM)
 	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@
 	@rm $(@D)/temp_$(<F)
 
-$(QT_QRC_CPP): $(QT_QRC) $(QT_FORMS_H) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS) $(PROTOBUF_H)
+$(QT_QRC_CPP): $(QT_QRC) $(QT_FORMS_H) $(RES_ICONS) $(RES_IMAGES) $(RES_CSS)
 	@test -f $(RCC)
 	$(AM_V_GEN) QT_SELECT=$(QT_SELECT) $(RCC) -name spectresecurity $< | \
 	  $(SED) -e '/^\*\*.*Created:/d' -e '/^\*\*.*by:/d' > $@

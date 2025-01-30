@@ -1,10 +1,9 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "qt/spectresecurity/navmenuwidget.h"
 #include "qt/spectresecurity/forms/ui_navmenuwidget.h"
-#include "qt/spectresecurity/spectresecuritygui.h"
 #include "qt/spectresecurity/qtutils.h"
 #include "clientversion.h"
 #include "optionsmodel.h"
@@ -38,7 +37,9 @@ NavMenuWidget::NavMenuWidget(SPECTRESECURITYGUI *mainWindow, QWidget *parent) :
     ui->btnColdStaking->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     ui->btnSettings->setProperty("name", "settings");
     ui->btnSettings->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-    btns = {ui->btnDashboard, ui->btnSend, ui->btnReceive, ui->btnAddress, ui->btnMaster, ui->btnColdStaking, ui->btnSettings, ui->btnColdStaking};
+    ui->btnGovernance->setProperty("name", "governance");
+    ui->btnGovernance->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    btns = {ui->btnDashboard, ui->btnSend, ui->btnReceive, ui->btnAddress, ui->btnMaster, ui->btnColdStaking, ui->btnSettings, ui->btnGovernance};
     onNavSelected(ui->btnDashboard, true);
 
     ui->scrollAreaNav->setWidgetResizable(true);
@@ -71,6 +72,7 @@ void NavMenuWidget::connectActions() {
     connect(ui->btnSettings, &QPushButton::clicked, this, &NavMenuWidget::onSettingsClicked);
     connect(ui->btnReceive, &QPushButton::clicked, this, &NavMenuWidget::onReceiveClicked);
     connect(ui->btnColdStaking, &QPushButton::clicked, this, &NavMenuWidget::onColdStakingClicked);
+    connect(ui->btnGovernance, &QPushButton::clicked, this, &NavMenuWidget::onGovClicked);
 
     ui->btnDashboard->setShortcut(QKeySequence(SHORT_KEY + Qt::Key_1));
     ui->btnSend->setShortcut(QKeySequence(SHORT_KEY + Qt::Key_2));
@@ -104,6 +106,12 @@ void NavMenuWidget::onMasterNodesClicked(){
 void NavMenuWidget::onColdStakingClicked() {
     window->goToColdStaking();
     onNavSelected(ui->btnColdStaking);
+}
+
+void NavMenuWidget::onGovClicked()
+{
+    window->goToGovernance();
+    onNavSelected(ui->btnGovernance);
 }
 
 void NavMenuWidget::onSettingsClicked(){
@@ -153,7 +161,8 @@ void NavMenuWidget::updateButtonStyles(){
          ui->btnMaster,
          ui->btnSettings,
          ui->btnReceive,
-         ui->btnColdStaking
+         ui->btnColdStaking,
+         ui->btnGovernance
     });
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -35,6 +35,7 @@ private Q_SLOTS:
     void onAddressClicked();
     void onMasterNodesClicked();
     void onColdStakingClicked();
+    void onGovClicked();
     void onSettingsClicked();
     void onReceiveClicked();
     void updateButtonStyles();

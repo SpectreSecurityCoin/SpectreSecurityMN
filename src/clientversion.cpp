@@ -1,5 +1,5 @@
 // Copyright (c) 2012-2017 The Bitcoin Core developers
-// Copyright (c) 2016-2019 The SPECTRESECURITY developers
+// Copyright (c) 2016-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,7 +13,7 @@
  * for both spectresecurityd and spectresecurity-qt, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
-const std::string CLIENT_NAME("SPECTRESECURITY Core");
+const std::string CLIENT_NAME(PACKAGE_NAME);
 
 /**
  * Client version number
@@ -45,8 +45,8 @@ const std::string CLIENT_NAME("SPECTRESECURITY Core");
 //! git will put "#define GIT_ARCHIVE 1" on the next line inside archives. 
 #define GIT_ARCHIVE 1
 #ifdef GIT_ARCHIVE
-#define GIT_COMMIT_ID "641b107ea24ff1077e6f5047bffc2f54f91e2a14"
-#define GIT_COMMIT_DATE "Thu, 14 Jan 2021 09:15:35 -0800"
+#define GIT_COMMIT_ID "af60f19642c6356061049df253e8036e81879f4e"
+#define GIT_COMMIT_DATE "Tue, 20 Feb 2024 13:11:10 -0800"
 #endif
 
 #define BUILD_DESC_WITH_SUFFIX(maj, min, rev, build, suffix) \
@@ -68,16 +68,7 @@ const std::string CLIENT_NAME("SPECTRESECURITY Core");
 #endif
 #endif
 
-#ifndef BUILD_DATE
-#ifdef GIT_COMMIT_DATE
-#define BUILD_DATE GIT_COMMIT_DATE
-#else
-#define BUILD_DATE __DATE__ ", " __TIME__
-#endif
-#endif
-
 const std::string CLIENT_BUILD(BUILD_DESC CLIENT_VERSION_SUFFIX);
-const std::string CLIENT_DATE(BUILD_DATE);
 
 static std::string FormatVersion(int nVersion)
 {

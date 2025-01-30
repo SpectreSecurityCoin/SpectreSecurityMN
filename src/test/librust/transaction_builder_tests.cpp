@@ -1,5 +1,5 @@
 // Copyright (c) 2016-2020 The ZCash developers
-// Copyright (c) 2020 The SPECTRESECURITY developers
+// Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
@@ -13,11 +13,11 @@
 #include <univalue.h>
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(sapling_transaction_builder_tests, SaplingTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(sapling_transaction_builder_tests, SaplingRegTestingSetup)
 
 BOOST_AUTO_TEST_CASE(TransparentToSapling)
 {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = Params().GetConsensus();
 
     CBasicKeyStore keystore;
     CKey tsk = AddTestCKeyToKeyStore(keystore);
@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(TransparentToSapling)
 
     // Create a shielding transaction from transparent to Sapling
     // 0.5 t-SSMN in, 0.4 shielded-SSMN out, 0.1 t-SSMN fee
-    auto builder = TransactionBuilder(consensusParams, 1, &keystore);
+    auto builder = TransactionBuilder(consensusParams, &keystore);
     builder.AddTransparentInput(COutPoint(uint256S("1234"), 0), scriptPubKey, 50000000);
     builder.AddSaplingOutput(fvk_from.ovk, pk, 40000000, {});
     builder.SetFee(10000000);
@@ -49,13 +49,11 @@ BOOST_AUTO_TEST_CASE(TransparentToSapling)
     CValidationState state;
     BOOST_CHECK(SaplingValidation::ContextualCheckTransaction(tx, state, Params(), 2, true, false));
     BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
-
-    // Revert to default
-    RegtestDeactivateSapling();
 }
 
-BOOST_AUTO_TEST_CASE(SaplingToSapling) {
-    auto consensusParams = RegtestActivateSapling();
+BOOST_AUTO_TEST_CASE(SaplingToSapling)
+{
+    auto consensusParams = Params().GetConsensus();
 
     auto sk = libzcash::SaplingSpendingKey::random();
     auto expsk = sk.expanded_spending_key();
@@ -65,7 +63,7 @@ BOOST_AUTO_TEST_CASE(SaplingToSapling) {
     // Create a Sapling-only transaction
     // --- 0.4 shielded-SSMN in, 0.299 shielded-SSMN out, 0.1 shielded-SSMN fee, 0.001 shielded-SSMN change (added to fee)
     auto testNote = GetTestSaplingNote(pa, 40000000);
-    auto builder = TransactionBuilder(consensusParams, 2);
+    auto builder = TransactionBuilder(consensusParams);
     builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
     builder.SetFee(10000000);
 
@@ -89,7 +87,7 @@ BOOST_AUTO_TEST_CASE(SaplingToSapling) {
 
     // --- Now try with 1 shielded-SSMN in, 0.5 shielded-SSMN out, 0.1 shielded-SSMN fee, 0.4 shielded-SSMN change
     auto testNote2 = GetTestSaplingNote(pa, 100000000);
-    auto builder2 = TransactionBuilder(consensusParams, 2);
+    auto builder2 = TransactionBuilder(consensusParams);
     builder2.AddSaplingSpend(expsk, testNote2.note, testNote2.tree.root(), testNote2.tree.witness());
     builder2.SetFee(10000000);
     builder2.AddSaplingOutput(fvk.ovk, pa, 50000000, {});
@@ -101,45 +99,33 @@ BOOST_AUTO_TEST_CASE(SaplingToSapling) {
     BOOST_CHECK_EQUAL(tx2.sapData->valueBalance, 10000000);
     BOOST_CHECK(SaplingValidation::ContextualCheckTransaction(tx2, state, Params(), 3, true, false));
     BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
-
-    // Revert to default
-    RegtestDeactivateSapling();
 }
 
 BOOST_AUTO_TEST_CASE(ThrowsOnTransparentInputWithoutKeyStore)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    auto consensusParams = Params().GetConsensus();
-
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(Params().GetConsensus());
     BOOST_CHECK_THROW(builder.AddTransparentInput(COutPoint(), CScript(), 1), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(RejectsInvalidTransparentOutput)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    auto consensusParams = Params().GetConsensus();
-
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(Params().GetConsensus());
     BOOST_CHECK_THROW(builder.AddTransparentOutput(taddr, 50), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(RejectsInvalidTransparentChangeAddress)
 {
-    SelectParams(CBaseChainParams::REGTEST);
-    auto consensusParams = Params().GetConsensus();
-
     // Default CTxDestination type is an invalid address
     CTxDestination taddr;
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(Params().GetConsensus());
     BOOST_CHECK_THROW(builder.SendChangeTo(taddr), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(FailsWithNegativeChange)
 {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -159,14 +145,14 @@ BOOST_AUTO_TEST_CASE(FailsWithNegativeChange)
 
     // Fail if there is only a Sapling output
     // 0.5 shielded-SSMN out, 0.1 t-SSMN fee
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(consensusParams);
     builder.AddSaplingOutput(fvk.ovk, pa, 50000000, {});
     builder.SetFee(10000000);
     BOOST_CHECK_EQUAL("Change cannot be negative", builder.Build().GetError());
 
     // Fail if there is only a transparent output
     // 0.5 t-SSMN out, 0.1 t-SSMN fee
-    builder = TransactionBuilder(consensusParams, 1, &keystore);
+    builder = TransactionBuilder(consensusParams, &keystore);
     builder.AddTransparentOutput(taddr, 50000000);
     builder.SetFee(10000000);
     BOOST_CHECK_EQUAL("Change cannot be negative", builder.Build().GetError());
@@ -179,14 +165,11 @@ BOOST_AUTO_TEST_CASE(FailsWithNegativeChange)
     // Succeeds if there is sufficient input
     builder.AddTransparentInput(COutPoint(), scriptPubKey, 10000);
     BOOST_CHECK(builder.Build().IsTx());
-
-    // Revert to default
-    RegtestDeactivateSapling();
 }
 
 BOOST_AUTO_TEST_CASE(ChangeOutput)
 {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -209,7 +192,7 @@ BOOST_AUTO_TEST_CASE(ChangeOutput)
 
     // No change address and no Sapling spends
     {
-        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
+        auto builder = TransactionBuilder(consensusParams, &keystore);
         builder.SetFee(10000000);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000000);
         BOOST_CHECK_EQUAL("Could not determine change address", builder.Build().GetError());
@@ -217,7 +200,7 @@ BOOST_AUTO_TEST_CASE(ChangeOutput)
 
     // Change to the same address as the first Sapling spend
     {
-        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
+        auto builder = TransactionBuilder(consensusParams, &keystore);
         builder.SetFee(10000000);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000000);
         builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
@@ -232,7 +215,7 @@ BOOST_AUTO_TEST_CASE(ChangeOutput)
 
     // Change to a Sapling address
     {
-        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
+        auto builder = TransactionBuilder(consensusParams, &keystore);
         builder.SetFee(10000000);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000000);
         builder.SendChangeTo(zChangeAddr, fvkOut.ovk);
@@ -247,7 +230,7 @@ BOOST_AUTO_TEST_CASE(ChangeOutput)
 
     // Change to a transparent address
     {
-        auto builder = TransactionBuilder(consensusParams, 1, &keystore);
+        auto builder = TransactionBuilder(consensusParams, &keystore);
         builder.SetFee(10000000);
         builder.AddTransparentInput(COutPoint(), scriptPubKey, 25000000);
         builder.SendChangeTo(taddr);
@@ -260,14 +243,11 @@ BOOST_AUTO_TEST_CASE(ChangeOutput)
         BOOST_CHECK_EQUAL(tx.sapData->valueBalance, 0);
         BOOST_CHECK_EQUAL(tx.vout[0].nValue, 15000000);
     }
-
-    // Revert to default
-    RegtestDeactivateSapling();
 }
 
 BOOST_AUTO_TEST_CASE(SetFee)
 {
-    auto consensusParams = RegtestActivateSapling();
+    auto consensusParams = Params().GetConsensus();
 
     // Generate dummy Sapling address
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -279,7 +259,7 @@ BOOST_AUTO_TEST_CASE(SetFee)
 
     // Configured fee (auto with SaplingOperation)
     {
-        auto builder = TransactionBuilder(consensusParams, 1);
+        auto builder = TransactionBuilder(consensusParams);
         builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
         builder.AddSaplingOutput(fvk.ovk, pa, 3 * COIN, {});
 
@@ -292,14 +272,10 @@ BOOST_AUTO_TEST_CASE(SetFee)
         BOOST_CHECK_EQUAL(tx.sapData->vShieldedOutput.size(), 2);
         BOOST_CHECK_EQUAL(tx.sapData->valueBalance, COIN);
     }
-
-    // Revert to default
-    RegtestDeactivateSapling();
 }
 
 BOOST_AUTO_TEST_CASE(CheckSaplingTxVersion)
 {
-    SelectParams(CBaseChainParams::REGTEST);
     auto consensusParams = Params().GetConsensus();
 
     auto sk = libzcash::SaplingSpendingKey::random();
@@ -307,7 +283,7 @@ BOOST_AUTO_TEST_CASE(CheckSaplingTxVersion)
     auto pk = sk.default_address();
 
     // Cannot add Sapling outputs to a non-Sapling transaction
-    auto builder = TransactionBuilder(consensusParams, 1);
+    auto builder = TransactionBuilder(consensusParams);
     builder.SetFee(10000000);
     try {
         builder.AddSaplingOutput(uint256(), pk, 12345, {});

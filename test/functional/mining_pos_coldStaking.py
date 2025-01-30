@@ -1,64 +1,35 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019-2020 The SPECTRESECURITY developers
+# Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-# -*- coding: utf-8 -*-
 
+from decimal import Decimal
 from io import BytesIO
 from time import sleep
 
 from test_framework.messages import CTransaction, CTxIn, CTxOut, COIN, COutPoint
-from test_framework.mininode import network_thread_start
-from test_framework.spectresecurity_node import SpectresecurityTestNode
 from test_framework.script import CScript, OP_CHECKSIG
 from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
     assert_equal,
     assert_greater_than,
     assert_raises_rpc_error,
-    p2p_port,
-    bytes_to_hex_str,
     set_node_times,
-    sync_blocks,
-    sync_mempools,
 )
-
-from decimal import Decimal
 
 # filter utxos based on first 5 bytes of scriptPubKey
 def getDelegatedUtxos(utxos):
-    return [x for x in utxos if x["scriptPubKey"][:10] == '76a97b63d1']
+    return [x for x in utxos if x["scriptPubKey"][:10] == '76a97b63d1' or x["scriptPubKey"][:10] == '76a97b63d2']
 
 
 class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
 
     def set_test_params(self):
         self.num_nodes = 3
-        self.extra_args = [['-nuparams=v5_shield:201']] * self.num_nodes
+        # whitelist all peers to speed up tx relay / mempool sync
+        self.extra_args = [['-nuparams=v5_shield:201', "-whitelist=127.0.0.1"]] * self.num_nodes
         self.extra_args[0].append('-sporkkey=932HEevBSujW2ud7RfB1YF91AFygbBRQj3de3LyaCRqNzKKgWXi')
-
-    def setup_chain(self):
-        # Start with PoW cache: 200 blocks
-        self.log.info("Initializing test directory " + self.options.tmpdir)
-        self._initialize_chain()
         self.enable_mocktime()
-
-    def init_test(self):
-        title = "*** Starting %s ***" % self.__class__.__name__
-        underline = "-" * len(title)
-        self.log.info("\n\n%s\n%s\n%s\n", title, underline, self.description)
-        self.DEFAULT_FEE = 0.05
-        # Setup the p2p connections and start up the network thread.
-        self.test_nodes = []
-        for i in range(self.num_nodes):
-            self.test_nodes.append(SpectresecurityTestNode())
-            self.test_nodes[i].peer_connect('127.0.0.1', p2p_port(i))
-
-        network_thread_start()  # Start up network handling in another thread
-
-        # Let the test nodes get in sync
-        for i in range(self.num_nodes):
-            self.test_nodes[i].wait_for_verack()
 
     def setColdStakingEnforcement(self, fEnable=True):
         sporkName = "SPORK_19_COLDSTAKING_MAINTENANCE"
@@ -79,11 +50,12 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         # verify from node[1]
         return not self.is_spork_active(1, "SPORK_19_COLDSTAKING_MAINTENANCE")
 
-
-
     def run_test(self):
         self.description = "Performs tests on the Cold Staking P2CS implementation"
-        self.init_test()
+        title = "*** Starting %s ***" % self.__class__.__name__
+        underline = "-" * len(title)
+        self.log.info("\n\n%s\n%s\n%s\n", title, underline, self.description)
+        self.DEFAULT_FEE = 0.05
         NUM_OF_INPUTS = 20
         INPUT_VALUE = 249
 
@@ -93,7 +65,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         # First put cold-staking in maintenance mode
         self.setColdStakingEnforcement(False)
         # double check
-        assert (not self.isColdStakingEnforced())
+        assert not self.isColdStakingEnforced()
 
         # 1) nodes[0] and nodes[2] mine 25 blocks each
         # --------------------------------------------
@@ -102,7 +74,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         for peer in [0, 2]:
             for j in range(25):
                 self.mocktime = self.generate_pow(peer, self.mocktime)
-            sync_blocks(self.nodes)
+            self.sync_blocks()
 
         # 2) node[1] sends his entire balance (50 mature rewards) to node[2]
         #  - node[2] stakes a block - node[1] locks the change
@@ -111,13 +83,13 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.log.info("Emptying node1 balance")
         assert_equal(self.nodes[1].getbalance(), 50 * 250)
         txid = self.nodes[1].sendtoaddress(self.nodes[2].getnewaddress(), (50 * 250 - 0.01))
-        assert (txid is not None)
-        sync_mempools(self.nodes)
+        assert txid is not None
+        self.sync_mempools()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         # lock the change output (so it's not used as stake input in generate_pos)
         for x in self.nodes[1].listunspent():
-            assert (self.nodes[1].lockunspent(False, [{"txid": x['txid'], "vout": x['vout']}]))
+            assert self.nodes[1].lockunspent(False, True, [{"txid": x['txid'], "vout": x['vout']}])
         # check that it cannot stake
         sleep(1)
         assert_equal(self.nodes[1].getstakingstatus()["stakeablecoins"], 0)
@@ -127,8 +99,8 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
                                                              "amount": Decimal('250.00')}], 1)
         self.sync_all()
         for i in range(6):
-            self.mocktime = self.generate_pow(0, self.mocktime)
-        sync_blocks(self.nodes)
+            self.mocktime = self.generate_pos(0, self.mocktime)
+        self.sync_blocks()
         assert_equal(self.nodes[0].getshieldbalance(), 250)
 
         # 3) nodes[0] generates a owner address
@@ -139,15 +111,16 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.log.info("Owner Address: %s" % owner_address)
         staker_address = self.nodes[1].getnewstakingaddress()
         staker_privkey = self.nodes[1].dumpprivkey(staker_address)
+        assert_equal(self.nodes[1].liststakingaddresses()[0]["address"], staker_address)
         self.log.info("Staking Address: %s" % staker_address)
 
         # 4) Check enforcement.
         # ---------------------
         print("*** 4 ***")
         # Check that SPORK 17 is disabled
-        assert (not self.isColdStakingEnforced())
+        assert not self.isColdStakingEnforced()
         self.log.info("Creating a stake-delegation tx before cold staking enforcement...")
-        assert_raises_rpc_error(-4, "Failed to accept tx in the memory pool (reason: cold-stake-inactive (code 16))\nTransaction canceled.",
+        assert_raises_rpc_error(-4, "Failed to accept tx in the memory pool (reason: cold-stake-inactive)\nTransaction canceled.",
                                 self.nodes[0].delegatestake, staker_address, INPUT_VALUE, owner_address,
                                 False, False, False, True)
         self.log.info("Good. Cold Staking NOT ACTIVE yet.")
@@ -155,7 +128,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         # Enable via SPORK
         self.setColdStakingEnforcement()
         # double check
-        assert (self.isColdStakingEnforced())
+        assert self.isColdStakingEnforced()
 
         # 5) nodes[0] delegates a number of inputs for nodes[1] to stake em.
         # ------------------------------------------------------------------
@@ -167,7 +140,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
 
         self.log.info("Now force the use of external address creating (but not sending) the delegation...")
         res = self.nodes[0].rawdelegatestake(staker_address, INPUT_VALUE, "yCgCXC8N5VThhfiaVuKaNLkNnrWduzVnoT", True)
-        assert(res is not None and res != "")
+        assert res is not None and res != ""
         self.log.info("Good. Warning NOT triggered.")
 
         self.log.info("Now delegate with internal owner address..")
@@ -177,25 +150,25 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.log.info("Nice. it was not possible.")
         self.log.info("Then try (creating but not sending) with the threshold value (1.00)")
         res = self.nodes[0].rawdelegatestake(staker_address, 1.00, owner_address)
-        assert(res is not None and res != "")
+        assert res is not None and res != ""
         self.log.info("Good. Warning NOT triggered.")
 
         self.log.info("Now creating %d real stake-delegation txes..." % NUM_OF_INPUTS)
         for i in range(NUM_OF_INPUTS-1):
             res = self.nodes[0].delegatestake(staker_address, INPUT_VALUE, owner_address)
-            assert(res != None and res["txid"] != None and res["txid"] != "")
+            assert res is not None and res["txid"] is not None and res["txid"] != ""
             assert_equal(res["owner_address"], owner_address)
             assert_equal(res["staker_address"], staker_address)
         # delegate  the shielded balance
         res = self.nodes[0].delegatestake(staker_address, INPUT_VALUE, owner_address, False, False, True)
-        assert (res != None and res["txid"] != None and res["txid"] != "")
+        assert res is not None and res["txid"] is not None and res["txid"] != ""
         assert_equal(res["owner_address"], owner_address)
         assert_equal(res["staker_address"], staker_address)
         fee = self.nodes[0].viewshieldtransaction(res["txid"])['fee']
         # sync and mine 2 blocks
-        sync_mempools(self.nodes)
+        self.sync_mempools()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         self.log.info("%d Txes created." % NUM_OF_INPUTS)
         # check balances:
         self.expected_balance = NUM_OF_INPUTS * INPUT_VALUE
@@ -213,11 +186,11 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         assert_equal(len(delegated_utxos), len(self.nodes[0].listcoldutxos()))
         u = delegated_utxos[0]
         txhash = self.spendUTXOwithNode(u, 0)
-        assert(txhash != None)
+        assert txhash is not None
         self.log.info("Good. Owner was able to spend - tx: %s" % str(txhash))
-        sync_mempools(self.nodes)
+        self.sync_mempools()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         # check tx
         self.check_tx_in_chain(0, txhash)
         self.check_tx_in_chain(1, txhash)
@@ -233,11 +206,13 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         print("*** 7 ***")
         self.log.info("Trying to generate a cold-stake block before whitelisting the owner...")
         assert_equal(self.nodes[1].getstakingstatus()["stakeablecoins"], 0)
+        assert_equal(self.nodes[1].listdelegators(), [])
         self.log.info("Nice. Cold staker was NOT able to create the block yet.")
 
         self.log.info("Whitelisting the owner...")
         ret = self.nodes[1].delegatoradd(owner_address)
-        assert(ret)
+        assert ret
+        assert_equal(self.nodes[1].listdelegators()[0]["address"], owner_address)
         self.log.info("Delegator address %s whitelisted" % owner_address)
 
         # 8) check that the staker CANNOT spend the coins.
@@ -250,8 +225,9 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed (Script failed an OP_CHECKCOLDSTAKEVERIFY operation",
                                 self.spendUTXOwithNode, u, 1)
         self.log.info("Good. Cold staker was NOT able to spend (failed OP_CHECKCOLDSTAKEVERIFY)")
-        self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        for _ in range(20): # Staking min depth
+            self.mocktime = self.generate_pos(2, self.mocktime)
+        self.sync_blocks()
 
         # 9) check that the staker can use the coins to stake a block with internal miner.
         # --------------------------------------------------------------------------------
@@ -264,7 +240,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.log.info("Block %s submitted" % newblockhash)
 
         # Verify that nodes[0] accepts it
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         assert_equal(self.nodes[0].getblockcount(), self.nodes[1].getblockcount())
         assert_equal(newblockhash, self.nodes[0].getbestblockhash())
         self.log.info("Great. Cold-staked block was accepted!")
@@ -286,13 +262,13 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         new_block = self.stake_next_block(1, stakeInputs, self.mocktime, staker_privkey)
         self.log.info("New block created (rawtx) by cold-staking. Trying to submit...")
         # Try to submit the block
-        ret = self.nodes[1].submitblock(bytes_to_hex_str(new_block.serialize()))
-        assert (ret is None)
+        ret = self.nodes[1].submitblock(new_block.serialize().hex())
+        assert ret is None
         self.log.info("Block %s submitted." % new_block.hash)
         assert_equal(new_block.hash, self.nodes[1].getbestblockhash())
 
         # Verify that nodes[0] accepts it
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         assert_equal(self.nodes[0].getblockcount(), self.nodes[1].getblockcount())
         assert_equal(new_block.hash, self.nodes[0].getbestblockhash())
         self.log.info("Great. Cold-staked block was accepted!")
@@ -316,12 +292,12 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         new_block = self.stake_next_block(1, stakeInputs, self.mocktime, "")
         self.log.info("New block created (rawtx) by cold-staking. Trying to submit...")
         # Try to submit the block
-        ret = self.nodes[1].submitblock(bytes_to_hex_str(new_block.serialize()))
+        ret = self.nodes[1].submitblock(new_block.serialize().hex())
         self.log.info("Block %s submitted." % new_block.hash)
-        assert("rejected" in ret)
+        assert "rejected" in ret
 
         # Verify that nodes[0] rejects it
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getblock, new_block.hash)
         self.log.info("Great. Malicious cold-staked block was NOT accepted!")
         self.checkBalances()
@@ -340,12 +316,12 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.add_output_to_coinstake(new_block, 100)
         self.log.info("New block created (rawtx) by cold-staking. Trying to submit...")
         # Try to submit the block
-        ret = self.nodes[1].submitblock(bytes_to_hex_str(new_block.serialize()))
+        ret = self.nodes[1].submitblock(new_block.serialize().hex())
         self.log.info("Block %s submitted." % new_block.hash)
-        assert_equal(ret, "bad-p2cs-outs")
+        assert ret in ["bad-p2cs-outs", "rejected"]
 
         # Verify that nodes[0] rejects it
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         assert_raises_rpc_error(-5, "Block not found", self.nodes[0].getblock, new_block.hash)
         self.log.info("Great. Malicious cold-staked block was NOT accepted!")
         self.checkBalances()
@@ -355,28 +331,39 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         # ----------------------------------------------------------------------------------------
         self.log.info("Let's void the contracts.")
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         print("*** 13 ***")
+        self.log.info("Invalidate delegation")
+        ret = self.nodes[1].delegatorremove(owner_address)
+        assert ret
+        assert_equal(self.nodes[1].listdelegators(), [])
+        assert_equal(self.nodes[1].listdelegators(True)[0]["address"], owner_address)
+        assert_equal(self.nodes[1].getstakingstatus()["stakeablecoins"], 0)
+        self.log.info("Re-enable delegation")
+        ret = self.nodes[1].delegatoradd(owner_address)
+        assert ret
+        assert_equal(self.nodes[1].listdelegators()[0]["address"], owner_address)
+        assert_equal(self.nodes[1].getstakingstatus()["stakeablecoins"], len(stakeable_coins))
         self.log.info("Cancel the stake delegation spending the delegated utxos...")
         delegated_utxos = getDelegatedUtxos(self.nodes[0].listunspent())
         # remove one utxo to spend later
         final_spend = delegated_utxos.pop()
         txhash = self.spendUTXOsWithNode(delegated_utxos, 0)
-        assert(txhash != None)
+        assert txhash is not None
         self.log.info("Good. Owner was able to void the stake delegations - tx: %s" % str(txhash))
-        sync_mempools(self.nodes)
+        self.sync_blocks()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
         # deactivate SPORK 17 and check that the owner can still spend the last utxo
         self.setColdStakingEnforcement(False)
-        assert (not self.isColdStakingEnforced())
+        assert not self.isColdStakingEnforced()
         txhash = self.spendUTXOsWithNode([final_spend], 0)
-        assert(txhash != None)
+        assert txhash is not None
         self.log.info("Good. Owner was able to void a stake delegation (with SPORK 17 disabled) - tx: %s" % str(txhash))
-        sync_mempools(self.nodes)
+        self.sync_mempools()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         # check tx
         self.check_tx_in_chain(0, txhash)
         self.check_tx_in_chain(1, txhash)
@@ -386,14 +373,14 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         self.log.info("Balances check out after the delegations have been voided.")
         # re-activate SPORK17
         self.setColdStakingEnforcement()
-        assert (self.isColdStakingEnforced())
+        assert self.isColdStakingEnforced()
 
         # 14) check that coinstaker is empty and can no longer stake.
         # -----------------------------------------------------------
         print("*** 14 ***")
         self.log.info("Trying to generate one cold-stake block again...")
         assert_equal(self.nodes[1].getstakingstatus()["stakeablecoins"], 0)
-        self.log.info("Cigar. Cold staker was NOT able to create any more blocks.")
+        self.log.info("Good. Cold staker was NOT able to create any more blocks.")
 
         # 15) check balances when mature.
         # -----------------------------------------------------------
@@ -403,17 +390,17 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
             for peer in [0, 2]:
                 for j in range(25):
                     self.mocktime = self.generate_pos(peer, self.mocktime)
-                sync_blocks(self.nodes)
+                self.sync_blocks()
         self.expected_balance = self.expected_immature_balance
         self.expected_immature_balance = 0
         self.checkBalances()
         delegated_utxos = getDelegatedUtxos(self.nodes[0].listunspent())
         txhash = self.spendUTXOsWithNode(delegated_utxos, 0)
-        assert (txhash != None)
+        assert txhash is not None
         self.log.info("Good. Owner was able to spend the cold staked coins - tx: %s" % str(txhash))
-        sync_mempools(self.nodes)
+        self.sync_mempools()
         self.mocktime = self.generate_pos(2, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         # check tx
         self.check_tx_in_chain(0, txhash)
         self.check_tx_in_chain(1, txhash)
@@ -423,6 +410,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
 
     def checkBalances(self):
         w_info = self.nodes[0].getwalletinfo()
+        assert_equal(self.nodes[0].getblockcount(), w_info['last_processed_block'])
         self.log.info("OWNER - Delegated %f / Cold %f   [%f / %f]" % (
             float(w_info["delegated_balance"]), w_info["cold_staking_balance"],
             float(w_info["immature_delegated_balance"]), w_info["immature_cold_staking_balance"]))
@@ -430,6 +418,7 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         assert_equal(float(w_info["immature_delegated_balance"]), self.expected_immature_balance)
         assert_equal(float(w_info["cold_staking_balance"]), 0)
         w_info = self.nodes[1].getwalletinfo()
+        assert_equal(self.nodes[1].getblockcount(), w_info['last_processed_block'])
         self.log.info("STAKER - Delegated %f / Cold %f   [%f / %f]" % (
             float(w_info["delegated_balance"]), w_info["cold_staking_balance"],
             float(w_info["immature_delegated_balance"]), w_info["immature_cold_staking_balance"]))
@@ -465,23 +454,20 @@ class SPECTRESECURITY_ColdStakingTest(SpectresecurityTestFramework):
         if not hasattr(self, 'DUMMY_KEY'):
             self.init_dummy_key()
         coinstake.vout.append(
-            CTxOut(value * COIN, CScript([self.DUMMY_KEY.get_pubkey(), OP_CHECKSIG])))
+            CTxOut(value * COIN, CScript([self.DUMMY_KEY.get_pubkey().get_bytes(), OP_CHECKSIG])))
         coinstake.vout[1].nValue -= value * COIN
         # re-sign coinstake
         prevout = COutPoint()
         prevout.deserialize_uniqueness(BytesIO(block.prevoutStake))
         coinstake.vin[0] = CTxIn(prevout)
         stake_tx_signed_raw_hex = self.nodes[peer].signrawtransaction(
-            bytes_to_hex_str(coinstake.serialize()))['hex']
+            coinstake.serialize().hex())['hex']
         block.vtx[1] = CTransaction()
         block.vtx[1].from_hex(stake_tx_signed_raw_hex)
         # re-sign block
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.re_sign_block()
-
-
-
 
 
 if __name__ == '__main__':

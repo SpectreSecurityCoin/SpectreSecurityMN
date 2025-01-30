@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -81,9 +81,9 @@ public:
     QMap<int, std::pair<qint64, qint64>> amountsByCache;
     qreal maxValue = 0;
     qint64 totalSsmn = 0;
-    qint64 totalZssmn = 0;
+    qint64 totalMN = 0;
     QList<qreal> valuesSsmn;
-    QList<qreal> valueszSsmn;
+    QList<qreal> valuesMN;
     QStringList xLabels;
 };
 
@@ -122,7 +122,7 @@ private Q_SLOTS:
     void onSortTypeChanged(const QString& value);
     void updateDisplayUnit();
     void showList();
-    void onTxArrived(const QString& hash, const bool& isCoinStake, const bool& isCSAnyType);
+    void onTxArrived(const QString& hash, const bool isCoinStake, const bool isMNReward, const bool isCSAnyType);
 
 #ifdef USE_QTCHARTS
     void windowResizeEvent(QResizeEvent* event);
@@ -133,53 +133,55 @@ private Q_SLOTS:
 #endif
 
 private:
-    Ui::DashboardWidget *ui;
-    FurAbstractListItemDelegate* txViewDelegate;
-    TransactionFilterProxy* filter;
-    TxViewHolder* txHolder;
-    TransactionTableModel* txModel;
-    int nDisplayUnit = -1;
-    bool isSync = false;
+    Ui::DashboardWidget *ui{nullptr};
+    FurAbstractListItemDelegate* txViewDelegate{nullptr};
+    TransactionFilterProxy* filter{nullptr};
+    TxViewHolder* txHolder{nullptr};
+    TransactionTableModel* txModel{nullptr};
+    int nDisplayUnit{-1};
+    bool isSync{false};
+
     void changeSort(int nSortIndex);
 
 #ifdef USE_QTCHARTS
 
-    int64_t lastRefreshTime = 0;
+    int64_t lastRefreshTime{0};
     std::atomic<bool> isLoading;
 
     // Chart
-    TransactionFilterProxy* stakesFilter = nullptr;
-    bool isChartInitialized = false;
-    QChartView *chartView = nullptr;
-    QBarSeries *series = nullptr;
-    QBarSet *set0 = nullptr;
-    QBarSet *set1 = nullptr;
+    TransactionFilterProxy* stakesFilter{nullptr};
+    bool isChartInitialized{false};
+    QChartView *chartView{nullptr};
+    QBarSeries *series{nullptr};
+    QBarSet *set0{nullptr};
+    QBarSet *set1{nullptr};
 
-    QBarCategoryAxis *axisX = nullptr;
-    QValueAxis *axisY = nullptr;
+    QBarCategoryAxis *axisX{nullptr};
+    QValueAxis *axisY{nullptr};
 
-    QChart *chart = nullptr;
-    bool isChartMin = false;
-    ChartShowType chartShow = YEAR;
-    int yearFilter = 0;
-    int monthFilter = 0;
-    int dayStart = 1;
-    bool hasZssmnStakes = false;
+    QChart *chart{nullptr};
+    bool isChartMin{false};
+    ChartShowType chartShow{YEAR};
+    int yearFilter{0};
+    int monthFilter{0};
+    int dayStart{1};
+    bool hasMNRewards{false};
 
-    ChartData* chartData = nullptr;
-    bool hasStakes = false;
-    bool fShowCharts = true;
+    ChartData* chartData{nullptr};
+    bool hasStakes{false};
+    bool fShowCharts{true};
+    std::atomic<bool> filterUpdateNeeded{false};
 
     void initChart();
     void showHideEmptyChart(bool show, bool loading, bool forceView = false);
     bool refreshChart();
     void tryChartRefresh();
     void updateStakeFilter();
-    const QMap<int, std::pair<qint64, qint64>> getAmountBy();
+    QMap<int, std::pair<qint64, qint64>> getAmountBy();
     bool loadChartData(bool withMonthNames);
     void updateAxisX(const QStringList *arg = nullptr);
     void setChartShow(ChartShowType type);
-    std::pair<int, int> getChartRange(QMap<int, std::pair<qint64, qint64>> amountsBy);
+    std::pair<int, int> getChartRange(const QMap<int, std::pair<qint64, qint64>>& amountsBy);
 
 private Q_SLOTS:
     void onChartRefreshed();

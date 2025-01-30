@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,9 +26,6 @@ public:
 
 protected Q_SLOTS:
     void accept() override;
-
-private Q_SLOTS:
-    void on_selectFileButton_clicked();
 
 private:
     Ui::OpenURIDialog* ui;

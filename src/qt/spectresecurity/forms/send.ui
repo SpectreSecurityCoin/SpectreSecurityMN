@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string notr="true">N/A</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="2,1">
    <property name="spacing">
@@ -255,7 +255,7 @@ padding-top:2px;
              <string notr="true">margin-left:8px;</string>
             </property>
             <property name="text">
-             <string>SPECTRESECURITY address or contact label</string>
+             <string>Recipient address</string>
             </property>
            </widget>
           </item>

@@ -57,9 +57,6 @@ private:
      */
     unsigned int nTodo;
 
-    //! Whether we're shutting down.
-    bool fQuit;
-
     //! The maximum number of elements to be processed in one batch
     unsigned int nBatchSize;
 
@@ -87,7 +84,7 @@ private:
                 }
                 // logically, the do loop starts here
                 while (queue.empty()) {
-                    if ((fMaster || fQuit) && nTodo == 0) {
+                    if (fMaster && nTodo == 0) {
                         nTotal--;
                         bool fRet = fAllOk;
                         // reset the status for new work later
@@ -126,7 +123,7 @@ private:
 
 public:
     //! Create a new check queue
-    CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), fQuit(false), nBatchSize(nBatchSizeIn) {}
+    explicit CCheckQueue(unsigned int nBatchSizeIn) : nIdle(0), nTotal(0), fAllOk(true), nTodo(0), nBatchSize(nBatchSizeIn) {}
 
     //! Worker thread
     void Thread()
@@ -180,8 +177,8 @@ private:
 public:
     CCheckQueueControl(CCheckQueue<T>* pqueueIn) : pqueue(pqueueIn), fDone(false)
     {
-        // passed queue is supposed to be unused, or NULL
-        if (pqueue != NULL) {
+        // passed queue is supposed to be unused, or nullptr
+        if (pqueue != nullptr) {
             bool isIdle = pqueue->IsIdle();
             assert(isIdle);
         }
@@ -189,7 +186,7 @@ public:
 
     bool Wait()
     {
-        if (pqueue == NULL)
+        if (pqueue == nullptr)
             return true;
         bool fRet = pqueue->Wait();
         fDone = true;
@@ -198,7 +195,7 @@ public:
 
     void Add(std::vector<T>& vChecks)
     {
-        if (pqueue != NULL)
+        if (pqueue != nullptr)
             pqueue->Add(vChecks);
     }
 

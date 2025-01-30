@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
-// Copyright (c) 2015-2019 The SPECTRESECURITY developers
+// Copyright (c) 2015-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,10 +8,9 @@
 
 #include "hash.h"
 #include "script/standard.h"
-#include "script/sign.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
-#include "util.h"
+#include "util/system.h"
 
 uint256 CBlockHeader::GetHash() const
 {

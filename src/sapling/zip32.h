@@ -1,18 +1,17 @@
-// Copyright (c) 2018 The Zcash developers
+// Copyright (c) 2018-2020 The ZCash developers
+// Copyright (c) 2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+// file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #ifndef SPECTRESECURITY_ZIP32_H
 #define SPECTRESECURITY_ZIP32_H
 
-#include "serialize.h"
-#include "allocators.h"
-#include "blob_uint256.h"
 #include "key.h"
-#include "uint256.h"
+#include "optional.h"
 #include "sapling/address.h"
-
-#include <boost/optional.hpp>
+#include "serialize.h"
+#include "support/allocators/zeroafterfree.h"
+#include "uint256.h"
 
 const uint32_t ZIP32_HARDENED_KEY_LIMIT = 0x80000000;
 const size_t ZIP32_XFVK_SIZE = 169;
@@ -57,24 +56,14 @@ struct SaplingExtendedFullViewingKey {
     libzcash::SaplingFullViewingKey fvk;
     uint256 dk;
 
-    ADD_SERIALIZE_METHODS;
+    SERIALIZE_METHODS(SaplingExtendedFullViewingKey, obj) { READWRITE(obj.depth, obj.parentFVKTag, obj.childIndex, obj.chaincode, obj.fvk, obj.dk); }
 
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(depth);
-        READWRITE(parentFVKTag);
-        READWRITE(childIndex);
-        READWRITE(chaincode);
-        READWRITE(fvk);
-        READWRITE(dk);
-    }
-
-    boost::optional<SaplingExtendedFullViewingKey> Derive(uint32_t i) const;
+    Optional<SaplingExtendedFullViewingKey> Derive(uint32_t i) const;
 
     // Returns the first index starting from j that generates a valid
     // payment address, along with the corresponding address. Returns
     // an error if the diversifier space is exhausted.
-    boost::optional<std::pair<diversifier_index_t, libzcash::SaplingPaymentAddress>>
+    Optional<std::pair<diversifier_index_t, libzcash::SaplingPaymentAddress>>
         Address(diversifier_index_t j) const;
 
     libzcash::SaplingPaymentAddress DefaultAddress() const;
@@ -103,17 +92,7 @@ struct SaplingExtendedSpendingKey {
     libzcash::SaplingExpandedSpendingKey expsk;
     uint256 dk;
 
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(depth);
-        READWRITE(parentFVKTag);
-        READWRITE(childIndex);
-        READWRITE(chaincode);
-        READWRITE(expsk);
-        READWRITE(dk);
-    }
+    SERIALIZE_METHODS(SaplingExtendedSpendingKey, obj) { READWRITE(obj.depth, obj.parentFVKTag, obj.childIndex, obj.chaincode, obj.expsk, obj.dk); }
 
     static SaplingExtendedSpendingKey Master(const HDSeed& seed);
 

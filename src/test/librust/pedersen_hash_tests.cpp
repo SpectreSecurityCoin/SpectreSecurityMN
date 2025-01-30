@@ -1,11 +1,13 @@
 // Copyright (c) 2016-2020 The ZCash developers
-// Copyright (c) 2020 The SPECTRESECURITY developers
+// Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "test/test_spectresecurity.h"
+
+#include "arith_uint256.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "test/test_spectresecurity.h"
 
 #include <boost/test/unit_test.hpp>
 #include <librustzcash.h>
@@ -26,7 +28,7 @@ BOOST_AUTO_TEST_CASE(pedersen_hash_testvectors)
     BOOST_CHECK(result == expected_result);
 
     // Simple bad scenario check
-    const uint256 c = uint256(1) + a;
+    const uint256& c = ArithToUint256(ARITH_UINT256_ONE + UintToArith256(a));
     result.SetNull();
     librustzcash_merkle_hash(25, c.begin(), b.begin(), result.begin());
     BOOST_CHECK(result != expected_result);

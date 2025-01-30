@@ -1,41 +1,31 @@
-// Copyright (c) 2016 The Bitcoin Core developers
-// Copyright (c) 2020 The SPECTRESECURITY developers
+// Copyright (c) 2016-2021 The Bitcoin Core developers
+// Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "wallet/test/wallet_test_fixture.h"
 
 #include "rpc/server.h"
-#include "sapling/sapling_util.h"
 #include "wallet/db.h"
-#include "wallet/wallet.h"
 #include "wallet/rpcwallet.h"
+#include "wallet/wallet.h"
 
-#include <librustzcash.h>
-
-void clean()
+WalletTestingSetupBase::WalletTestingSetupBase(const std::string& chainName,
+                                               const std::string& wallet_name,
+                                               std::unique_ptr<WalletDatabase> db) :
+        SaplingTestingSetup(chainName), m_wallet(wallet_name, std::move(db))
 {
-    delete pwalletMain;
-    pwalletMain = nullptr;
-
-    bitdb.Flush(true);
-    bitdb.Reset();
-}
-
-WalletTestingSetup::WalletTestingSetup(): SaplingTestingSetup()
-{
-    clean(); // todo: research why we have an initialized bitdb here.
-    bitdb.MakeMock();
-    RegisterWalletRPCCommands(tableRPC);
-
     bool fFirstRun;
-    pwalletMain = new CWallet("test_wallet.dat");
-    pwalletMain->LoadWallet(fFirstRun);
-    RegisterValidationInterface(pwalletMain);
+    m_wallet.LoadWallet(fFirstRun);
+    RegisterValidationInterface(&m_wallet);
+
+    RegisterWalletRPCCommands(tableRPC);
 }
 
-WalletTestingSetup::~WalletTestingSetup()
+WalletTestingSetupBase::~WalletTestingSetupBase()
 {
-    UnregisterValidationInterface(pwalletMain);
-    clean();
+    UnregisterValidationInterface(&m_wallet);
 }
+
+WalletTestingSetup::WalletTestingSetup(const std::string& chainName) :
+        WalletTestingSetupBase(chainName, "mock", WalletDatabase::CreateMock()) {}

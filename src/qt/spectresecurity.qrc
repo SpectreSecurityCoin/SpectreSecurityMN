@@ -62,6 +62,7 @@
         <file alias="ic-arrow-white-right">spectresecurity/res/img/ic-arrow-white-right.svg</file>
         <file alias="ic-check-active">spectresecurity/res/img/ic-check-active.svg</file>
         <file alias="ic-check-box">spectresecurity/res/img/ic-check-box.svg</file>
+        <file alias="ic-check-box-light">spectresecurity/res/img/ic-check-box-light.svg</file>
         <file alias="ic-check-box-liliac-indeterminate">spectresecurity/res/img/ic-check-box-liliac-indeterminate.svg</file>
         <file alias="ic-check-connect-off">spectresecurity/res/img/ic-check-connect-off.svg</file>
         <file alias="ic-check-connect">spectresecurity/res/img/ic-check-connect.svg</file>
@@ -141,10 +142,12 @@
         <file alias="ic-transaction-warning">spectresecurity/res/img/ic-transaction-warning.svg</file>
         <file alias="ic-transaction-mint">spectresecurity/res/img/ic-transaction-mint.svg</file>
         <file alias="ic-transaction-received">spectresecurity/res/img/ic-transaction-received.svg</file>
+        <file alias="ic-transaction-received-memo">spectresecurity/res/img/ic-transaction-received-memo.svg</file>
         <file alias="ic-transaction-sent">spectresecurity/res/img/ic-transaction-sent.svg</file>
         <file alias="ic-transaction-staked">spectresecurity/res/img/ic-transaction-staked.svg</file>
         <file alias="ic-transaction-mint-dark">spectresecurity/res/img/dark/ic-transaction-mint.svg</file>
         <file alias="ic-transaction-received-dark">spectresecurity/res/img/dark/ic-transaction-received.svg</file>
+        <file alias="ic-transaction-received-memo-dark">spectresecurity/res/img/dark/ic-transaction-received-memo.svg</file>
         <file alias="ic-transaction-sent-dark">spectresecurity/res/img/dark/ic-transaction-sent.svg</file>
         <file alias="ic-transaction-staked-dark">spectresecurity/res/img/dark/ic-transaction-staked.svg</file>
         <file alias="ic-transaction-mint-inactive">spectresecurity/res/img/ic-transaction-mint-inactive.svg</file>
@@ -222,5 +225,19 @@
         <file alias="ic-check-cold-staking-enabled">spectresecurity/res/img/ic-check-cold-staking-enabled.svg</file>
         <file alias="ic-information">spectresecurity/res/img/ic-information.svg</file>
         <file alias="ic-information-hover">spectresecurity/res/img/ic-information-hover.svg</file>
+        <file alias="ic-check-vote">spectresecurity/res/img/ic-check-vote.svg</file>
+        <file alias="ic-check-vote-active">spectresecurity/res/img/ic-check-vote-active.svg</file>
+        <file alias="ic-check-vote-dark">spectresecurity/res/img/ic-check-vote-dark.svg</file>
+        <file alias="ic-check-vote-active-dark">spectresecurity/res/img/ic-check-vote-active-dark.svg</file>
+        <file alias="ic-filter">spectresecurity/res/img/ic-filter.svg</file>
+        <file alias="ic-link">spectresecurity/res/img/ic-link.svg</file>
+        <file alias="ic-link-hover">spectresecurity/res/img/ic-link-hover.svg</file>
+        <file alias="ic-nav-governance">spectresecurity/res/img/ic-nav-governance.svg</file>
+        <file alias="ic-nav-governance-active">spectresecurity/res/img/ic-nav-governance-active.svg</file>
+        <file alias="ic-nav-governance-hover">spectresecurity/res/img/ic-nav-governance-hover.svg</file>
+        <file alias="ic-time">spectresecurity/res/img/ic-time.svg</file>
+        <file alias="img-empty-governance">spectresecurity/res/img/img-empty-governance.svg</file>
+        <file alias="img-empty-dark-governance">spectresecurity/res/img/img-empty-dark-governance.svg</file>
+        <file alias="ic-check-block">spectresecurity/res/img/ic-check-block.svg</file>
     </qresource>
 </RCC>

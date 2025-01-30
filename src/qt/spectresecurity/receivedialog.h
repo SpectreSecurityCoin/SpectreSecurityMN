@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,7 +6,6 @@
 #define RECEIVEDIALOG_H
 
 #include "qt/spectresecurity/focuseddialog.h"
-#include <QPixmap>
 
 class SendCoinsRecipient;
 
@@ -22,14 +21,13 @@ public:
     explicit ReceiveDialog(QWidget *parent = nullptr);
     ~ReceiveDialog();
 
-    void updateQr(QString address);
+    void updateQr(const QString& address);
 
 private Q_SLOTS:
     void onCopy();
 private:
-    Ui::ReceiveDialog *ui;
-    QPixmap *qrImage;
-    SendCoinsRecipient *info = nullptr;
+    Ui::ReceiveDialog *ui{nullptr};
+    SendCoinsRecipient *info{nullptr};
 };
 
 #endif // RECEIVEDIALOG_H

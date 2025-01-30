@@ -1,9 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2019 The SPECTRESECURITY developers
+// Copyright (c) 2015-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
+
+#if defined(HAVE_CONFIG_H)
+#include "config/spectresecurity-config.h"
+#endif
 
 #include "chainparams.h"
 #include "clientversion.h"
@@ -11,8 +15,8 @@
 #include "init.h"
 #include "masternodeconfig.h"
 #include "noui.h"
-#include "rpc/server.h"
-#include "util.h"
+#include "shutdown.h"
+#include "util/system.h"
 
 #include <stdio.h>
 
@@ -32,15 +36,10 @@
  * Use the buttons <code>Namespaces</code>, <code>Classes</code> or <code>Files</code> at the top of the page to start navigating the code.
  */
 
-static bool fDaemon;
-
 void WaitForShutdown()
 {
-    bool fShutdown = ShutdownRequested();
-    // Tell the main threads to shutdown.
-    while (!fShutdown) {
+    while (!ShutdownRequested()) {
         MilliSleep(200);
-        fShutdown = ShutdownRequested();
     }
     Interrupt();
 }
@@ -61,56 +60,66 @@ bool AppInit(int argc, char* argv[])
 
     // Process help and version before taking care about datadir
     if (gArgs.IsArgSet("-?") || gArgs.IsArgSet("-h") || gArgs.IsArgSet("-help") || gArgs.IsArgSet("-version")) {
-        std::string strUsage = _("Spectresecurity Core Daemon") + " " + _("version") + " " + FormatFullVersion() + "\n";
+        std::string strUsage = PACKAGE_NAME " Daemon version " + FormatFullVersion() + "\n";
 
         if (gArgs.IsArgSet("-version")) {
             strUsage += LicenseInfo();
         } else {
-            strUsage += "\n" + _("Usage:") + "\n" +
-                        "  spectresecurityd [options]                     " + _("Start Spectresecurity Core Daemon") + "\n";
-
+            strUsage += "\nUsage:  spectresecurityd [options]                     Start " PACKAGE_NAME " Daemon\n";
             strUsage += "\n" + HelpMessage(HMM_BITCOIND);
         }
 
         fprintf(stdout, "%s", strUsage.c_str());
-        return false;
+        return true;
     }
 
     try {
-        if (!fs::is_directory(GetDataDir(false))) {
+        if (!CheckDataDirOption()) {
             fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", gArgs.GetArg("-datadir", "").c_str());
             return false;
         }
         try {
-            gArgs.ReadConfigFile();
+            gArgs.ReadConfigFile(gArgs.GetArg("-conf", SPECTRESECURITY_CONF_FILENAME));
         } catch (const std::exception& e) {
             fprintf(stderr, "Error reading configuration file: %s\n", e.what());
             return false;
         }
         // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
-        if (!SelectParamsFromCommandLine()) {
-            fprintf(stderr, "Error: Invalid combination of -regtest and -testnet.\n");
-            return false;
-        }
-
-        // parse masternode.conf
-        std::string strErr;
-        if (!masternodeConfig.read(strErr)) {
-            fprintf(stderr, "Error reading masternode configuration file: %s\n", strErr.c_str());
+        try {
+            SelectParams(gArgs.GetChainName());
+        } catch(const std::exception& e) {
+            fprintf(stderr, "Error: %s\n", e.what());
             return false;
         }
 
         // Error out when loose non-argument tokens are encountered on command line
         for (int i = 1; i < argc; i++) {
             if (!IsSwitchChar(argv[i][0])) {
-                fprintf(stderr, "Error: Command line contains unexpected token '%s', see bitcoind -h for a list of options.\n", argv[i]);
-                exit(EXIT_FAILURE);
+                fprintf(stderr, "Error: Command line contains unexpected token '%s', see spectresecurityd -h for a list of options.\n", argv[i]);
+                return false;
             }
         }
 
+        // -server defaults to true for spectresecurityd but not for the GUI so do this here
+        gArgs.SoftSetBoolArg("-server", true);
+        // Set this early so that parameter interactions go to console
+        InitLogging();
+        InitParameterInteraction();
+        if (!AppInitBasicSetup()) {
+            // UIError will have been called with detailed error, which ends up on console
+            return false;
+        }
+        if (!AppInitParameterInteraction()) {
+            // UIError will have been called with detailed error, which ends up on console
+            return false;
+        }
+        if (!AppInitSanityChecks()) {
+            // UIError will have been called with detailed error, which ends up on console
+            return false;
+        }
+
 #ifndef WIN32
-        fDaemon = gArgs.GetBoolArg("-daemon", false);
-        if (fDaemon) {
+        if (gArgs.GetBoolArg("-daemon", false)) {
             fprintf(stdout, "SPECTRESECURITY server starting\n");
 
             // Daemonize
@@ -130,16 +139,13 @@ bool AppInit(int argc, char* argv[])
                 fprintf(stderr, "Error: setsid() returned %d errno %d\n", sid, errno);
         }
 #endif
-        gArgs.SoftSetBoolArg("-server", true);
 
         // Set this early so that parameter interactions go to console
-        InitLogging();
-        InitParameterInteraction();
-        fRet = AppInit2();
+        fRet = AppInitMain();
     } catch (const std::exception& e) {
         PrintExceptionContinue(&e, "AppInit()");
     } catch (...) {
-        PrintExceptionContinue(NULL, "AppInit()");
+        PrintExceptionContinue(nullptr, "AppInit()");
     }
 
     if (!fRet) {
@@ -154,6 +160,10 @@ bool AppInit(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+#ifdef WIN32
+    util::WinCmdLineArgs winArgs;
+    std::tie(argc, argv) = winArgs.get();
+#endif
     SetupEnvironment();
 
     // Connect spectresecurityd signal handlers

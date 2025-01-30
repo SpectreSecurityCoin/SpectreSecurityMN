@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,12 +21,16 @@
 #include "qt/spectresecurity/receivewidget.h"
 #include "qt/spectresecurity/addresseswidget.h"
 #include "qt/spectresecurity/coldstakingwidget.h"
+#include "qt/spectresecurity/governancewidget.h"
 #include "qt/spectresecurity/masternodeswidget.h"
 #include "qt/spectresecurity/snackbar.h"
 #include "qt/spectresecurity/settings/settingswidget.h"
 #include "qt/spectresecurity/settings/settingsfaqwidget.h"
 #include "qt/rpcconsole.h"
 
+namespace interfaces {
+    class Handler;
+}
 
 class ClientModel;
 class NetworkStyle;
@@ -67,6 +71,7 @@ public Q_SLOTS:
     void goToReceive();
     void goToAddresses();
     void goToMasterNodes();
+    void goToGovernance();
     void goToColdStaking();
     void goToSettings();
     void goToSettingsInfo();
@@ -93,6 +98,8 @@ public Q_SLOTS:
     /** Show incoming transaction notification for new transactions. */
     void incomingTransaction(const QString& date, int unit, const CAmount& amount, const QString& type, const QString& address);
 #ifdef ENABLE_WALLET
+    void setGovModel(GovernanceModel* govModel);
+    void setMNModel(MNModel* mnModel);
     /** Set the wallet model.
         The wallet model represents a bitcoin wallet, and offers access to the list of transactions, address book and sending
         functionality.
@@ -114,13 +121,16 @@ protected:
      */
 
 private:
+    // Handlers
+    std::unique_ptr<interfaces::Handler> m_handler_message_box;
+
     bool enableWallet;
     ClientModel* clientModel = nullptr;
+    MNModel* mnModel = nullptr;
 
     // Actions
     QAction* quitAction = nullptr;
     QAction* toggleHideAction = nullptr;
-
 
     // Frame
     NavMenuWidget *navMenu = nullptr;
@@ -133,6 +143,7 @@ private:
     AddressesWidget *addressesWidget = nullptr;
     MasterNodesWidget *masterNodesWidget = nullptr;
     ColdStakingWidget *coldStakingWidget = nullptr;
+    GovernanceWidget* governancewidget{nullptr};
     SettingsWidget* settingsWidget = nullptr;
 
     SnackBar *snackBar = nullptr;
@@ -163,7 +174,7 @@ private:
     void unsubscribeFromCoreSignals();
 
 public Q_SLOTS:
-    /** called by a timer to check if fRequestShutdown has been set **/
+    /** called by a timer to check if ShutdownRequested() **/
     void detectShutdown();
 
 private Q_SLOTS:

@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string notr="true">N/A</string>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="2,1">
    <property name="spacing">
@@ -336,6 +336,16 @@ and vote on the treasury system receiving a periodic reward.</string>
         <property name="spacing">
          <number>6</number>
         </property>
+        <item>
+         <widget class="OptionButton" name="btnCoinControl" native="true">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>50</height>
+           </size>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="OptionButton" name="btnAbout" native="true">
           <property name="minimumSize">

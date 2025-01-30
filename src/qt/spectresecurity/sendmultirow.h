@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -43,18 +43,19 @@ public:
     /** Return whether the entry is still empty and unedited */
     bool isClear();
     void setOnlyStakingAddressAccepted(bool onlyStakingAddress);
-    CAmount getAmountValue(QString str);
 
     void setAddress(const QString& address);
     void setLabel(const QString& label);
     void setAmount(const QString& amount);
     void setAddressAndLabelOrDescription(const QString& address, const QString& message);
     void setFocus();
+    void toggleSubtractFeeFromAmount();
 
     QRect getEditLineRect();
     int getEditHeight();
     int getEditWidth();
     int getMenuBtnWidth();
+    bool getSubtractFeeFromAmount() const;
 
     // Return true if memo was set and false if it was cleared.
     bool launchMemoDialog();
@@ -69,7 +70,7 @@ Q_SIGNALS:
     void onContactsClicked(SendMultiRow* entry);
     void onMenuClicked(SendMultiRow* entry);
     void onValueChanged();
-    void onUriParsed(SendCoinsRecipient rcp);
+    void onUriParsed(const SendCoinsRecipient& rcp);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
@@ -84,14 +85,14 @@ private Q_SLOTS:
     //void on_addressBookButton_clicked();
 
 private:
-    Ui::SendMultiRow *ui;
-    QPushButton *iconNumber;
-    QAction *btnContact;
+    Ui::SendMultiRow *ui{nullptr};
+    QPushButton *iconNumber{nullptr};
+    QAction *btnContact{nullptr};
 
-    int displayUnit;
-    int number = 0;
-    bool isExpanded = false;
-    bool onlyStakingAddressAccepted = false;
+    int displayUnit{0};
+    int number{0};
+    bool isExpanded{false};
+    bool onlyStakingAddressAccepted{false};
 
     SendCoinsRecipient recipient;
 

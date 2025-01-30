@@ -1,9 +1,9 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "qt/spectresecurity/addressfilterproxymodel.h"
-#include <iostream>
+#include "qt/addresstablemodel.h"
 
 bool AddressFilterProxyModel::filterAcceptsRow(int row, const QModelIndex& parent) const
 {

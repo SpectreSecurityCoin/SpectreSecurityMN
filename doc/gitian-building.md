@@ -56,7 +56,7 @@ On Debian you might have to compile a suitable version of lxc or you can use Ubu
 
 #### macOS Builds
 
-In order to build and sign for macOS, you need to download the free SDK and extract a file. The steps are described [here](./gitian-building/gitian-building-mac-os-sdk.md). Alternatively, you can skip the macOS build by adding `--os=lw` below.
+In order to build and sign for macOS, you need to download the free SDK and extract a file. The steps are described [here](../contrib/macdeploy/README.md#sdk-extraction). Alternatively, you can skip the macOS build by adding `--os=lw` below.
 
 Initial Gitian Setup
 --------------------
@@ -101,7 +101,7 @@ The build process results in a number of `.assert` files in your local gitian.si
 Signing Externally
 --------------------
 
-If your gitian host does not have your GPG private key installed, you will need to copy these uncommited changes to your host machine, where you can sign them:
+If your gitian host does not have your GPG private key installed, you will need to copy these uncommitted changes to your host machine, where you can sign them:
 
 ```bash
 gpg --output ${VERSION}-linux/${NAME}/spectresecurity-linux-${VERSION%\.*}-build.assert.sig --detach-sign ${VERSION}-linux/$NAME/spectresecurity-linux-${VERSION%\.*}-build.assert

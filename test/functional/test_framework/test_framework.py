@@ -11,7 +11,6 @@ import optparse
 import os
 import pdb
 import shutil
-from struct import pack
 import sys
 import tempfile
 import time
@@ -24,20 +23,20 @@ from .blocktools import (
     create_coinbase_pos,
     create_transaction_from_outpoint,
 )
-from .key import CECKey
+from .key import ECKey
 from .messages import (
     COIN,
     COutPoint,
     CTransaction,
     CTxIn,
     CTxOut,
-    hash256,
 )
 from .script import (
     CScript,
     OP_CHECKSIG,
 )
 from .test_node import TestNode
+from .mininode import NetworkThread
 from .util import (
     MAX_NODES,
     PortSeed,
@@ -47,19 +46,19 @@ from .util import (
     connect_nodes,
     connect_nodes_clique,
     disconnect_nodes,
+    get_collateral_vout,
     Decimal,
     DEFAULT_FEE,
     get_datadir_path,
     hex_str_to_bytes,
-    bytes_to_hex_str,
     initialize_datadir,
+    is_coin_locked_by,
+    create_new_dmn,
     p2p_port,
     set_node_times,
     SPORK_ACTIVATION_TIME,
     SPORK_DEACTIVATION_TIME,
-    sync_blocks,
-    sync_mempools,
-    vZC_DENOMS,
+    satoshi_round,
     wait_until,
 )
 
@@ -95,8 +94,11 @@ class SpectresecurityTestFramework():
         """Sets test framework defaults. Do not override this method. Instead, override the set_test_params() method"""
         self.setup_clean_chain = False
         self.nodes = []
+        self.network_thread = None
         self.mocktime = 0
+        self.rpc_timewait = 600  # Wait for up to 600 seconds for the RPC server to respond
         self.supports_cli = False
+        self.bind_to_localhost_only = True
         self.set_test_params()
 
         assert hasattr(self, "num_nodes"), "Test must set self.num_nodes in set_test_params()"
@@ -153,6 +155,10 @@ class SpectresecurityTestFramework():
             self.options.tmpdir = tempfile.mkdtemp(prefix=TMPDIR_PREFIX)
         self._start_logging()
 
+        self.log.debug('Setting up network thread')
+        self.network_thread = NetworkThread()
+        self.network_thread.start()
+
         success = TestStatus.FAILED
 
         try:
@@ -163,24 +169,26 @@ class SpectresecurityTestFramework():
             time.sleep(5)
             self.run_test()
             success = TestStatus.PASSED
-        except JSONRPCException as e:
+        except JSONRPCException:
             self.log.exception("JSONRPC error")
         except SkipTest as e:
             self.log.warning("Test Skipped: %s" % e.message)
             success = TestStatus.SKIPPED
-        except AssertionError as e:
+        except AssertionError:
             self.log.exception("Assertion failed")
-        except KeyError as e:
+        except KeyError:
             self.log.exception("Key error")
-        except Exception as e:
+        except Exception:
             self.log.exception("Unexpected exception caught during testing")
-        except KeyboardInterrupt as e:
+        except KeyboardInterrupt:
             self.log.warning("Exiting after keyboard interrupt")
 
         if success == TestStatus.FAILED and self.options.pdbonfailure:
             print("Testcase failed. Attaching python debugger. Enter ? for help")
             pdb.set_trace()
 
+        self.log.debug('Closing down network thread')
+        self.network_thread.close()
         if not self.options.noshutdown:
             self.log.info("Stopping nodes")
             if self.nodes:
@@ -261,9 +269,12 @@ class SpectresecurityTestFramework():
 
     # Public helper methods. These can be accessed by the subclass test scripts.
 
-    def add_nodes(self, num_nodes, extra_args=None, rpchost=None, timewait=None, binary=None):
+    def add_nodes(self, num_nodes, extra_args=None, *, rpchost=None, binary=None):
         """Instantiate TestNode objects"""
-
+        if self.bind_to_localhost_only:
+            extra_confs = [["bind=127.0.0.1"]] * num_nodes
+        else:
+            extra_confs = [[]] * num_nodes
         if extra_args is None:
             extra_args = [[]] * num_nodes
         # Check wallet version
@@ -273,10 +284,11 @@ class SpectresecurityTestFramework():
             self.log.info("Running test with legacy (pre-HD) wallet")
         if binary is None:
             binary = [None] * num_nodes
+            assert_equal(len(extra_confs), num_nodes)
         assert_equal(len(extra_args), num_nodes)
         assert_equal(len(binary), num_nodes)
         for i in range(num_nodes):
-            self.nodes.append(TestNode(i, self.options.tmpdir, extra_args[i], rpchost, timewait=timewait, binary=binary[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir, use_cli=self.options.usecli))
+            self.nodes.append(TestNode(i, self.options.tmpdir, rpchost=rpchost, timewait=self.rpc_timewait, binary=binary[i], stderr=None, mocktime=self.mocktime, coverage_dir=self.options.coveragedir, extra_conf=extra_confs[i], extra_args=extra_args[i], use_cli=self.options.usecli))
 
     def start_node(self, i, *args, **kwargs):
         """Start a spectresecurityd"""
@@ -334,27 +346,6 @@ class SpectresecurityTestFramework():
         self.stop_node(i)
         self.start_node(i, extra_args)
 
-    def assert_start_raises_init_error(self, i, extra_args=None, expected_msg=None, *args, **kwargs):
-        with tempfile.SpooledTemporaryFile(max_size=2**16) as log_stderr:
-            try:
-                self.start_node(i, extra_args, stderr=log_stderr, *args, **kwargs)
-                self.stop_node(i)
-            except Exception as e:
-                assert 'spectresecurityd exited' in str(e)  # node must have shutdown
-                self.nodes[i].running = False
-                self.nodes[i].process = None
-                if expected_msg is not None:
-                    log_stderr.seek(0)
-                    stderr = log_stderr.read().decode('utf-8')
-                    if expected_msg not in stderr:
-                        raise AssertionError("Expected error \"" + expected_msg + "\" not found in:\n" + stderr)
-            else:
-                if expected_msg is None:
-                    assert_msg = "spectresecurityd should have exited with an error"
-                else:
-                    assert_msg = "spectresecurityd should have exited with expected error " + expected_msg
-                raise AssertionError(assert_msg)
-
     def wait_for_node_exit(self, i, timeout):
         self.nodes[i].process.wait(timeout)
 
@@ -364,7 +355,8 @@ class SpectresecurityTestFramework():
         """
         disconnect_nodes(self.nodes[1], 2)
         disconnect_nodes(self.nodes[2], 1)
-        self.sync_all([self.nodes[:2], self.nodes[2:]])
+        self.sync_all(self.nodes[:2])
+        self.sync_all(self.nodes[2:])
 
     def join_network(self):
         """
@@ -373,13 +365,52 @@ class SpectresecurityTestFramework():
         connect_nodes(self.nodes[1], 2)
         self.sync_all()
 
-    def sync_all(self, node_groups=None):
-        if not node_groups:
-            node_groups = [self.nodes]
+    def sync_blocks(self, nodes=None, wait=1, timeout=60):
+        """
+        Wait until everybody has the same tip.
+        sync_blocks needs to be called with an rpc_connections set that has least
+        one node already synced to the latest, stable tip, otherwise there's a
+        chance it might return before all nodes are stably synced.
+        """
+        rpc_connections = nodes or self.nodes
+        stop_time = time.time() + timeout
+        while time.time() <= stop_time:
+            best_hash = [x.getbestblockhash() for x in rpc_connections]
+            if best_hash.count(best_hash[0]) == len(rpc_connections):
+                return
+            # Check that each peer has at least one connection
+            assert all([len(x.getpeerinfo()) for x in rpc_connections])
+            time.sleep(wait)
+        raise AssertionError("Block sync timed out after {}s:{}".format(
+            timeout,
+            "".join("\n  {!r}".format(b) for b in best_hash),
+        ))
 
-        for group in node_groups:
-            sync_blocks(group)
-            sync_mempools(group)
+    def sync_mempools(self, nodes=None, wait=1, timeout=60, flush_scheduler=True):
+        """
+        Wait until everybody has the same transactions in their memory
+        pools
+        """
+        rpc_connections = nodes or self.nodes
+        stop_time = time.time() + timeout
+        while time.time() <= stop_time:
+            pool = [set(r.getrawmempool()) for r in rpc_connections]
+            if pool.count(pool[0]) == len(rpc_connections):
+                if flush_scheduler:
+                    for r in rpc_connections:
+                        r.syncwithvalidationinterfacequeue()
+                return
+            # Check that each peer has at least one connection
+            assert all([len(x.getpeerinfo()) for x in rpc_connections])
+            time.sleep(wait)
+        raise AssertionError("Mempool sync timed out after {}s:{}".format(
+            timeout,
+            "".join("\n  {!r}".format(m) for m in pool),
+        ))
+
+    def sync_all(self, nodes=None):
+        self.sync_blocks(nodes)
+        self.sync_mempools(nodes)
 
     def enable_mocktime(self):
         """Enable mocktime for the script.
@@ -410,7 +441,7 @@ class SpectresecurityTestFramework():
         ll = int(self.options.loglevel) if self.options.loglevel.isdigit() else self.options.loglevel.upper()
         ch.setLevel(ll)
         # Format logs the same as spectresecurityd's debug.log with microprecision (so log files can be concatenated and sorted)
-        formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)03d000 %(name)s (%(levelname)s): %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = logging.Formatter(fmt='%(asctime)s.%(msecs)03d000Z %(name)s (%(levelname)s): %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
         formatter.converter = time.gmtime
         fh.setFormatter(formatter)
         ch.setFormatter(formatter)
@@ -450,7 +481,7 @@ class SpectresecurityTestFramework():
             node_0_datadir = os.path.join(get_datadir_path(cachedir, 0), "regtest")
             for i in range(from_num, MAX_NODES):
                 node_i_datadir = os.path.join(get_datadir_path(cachedir, i), "regtest")
-                for subdir in ["blocks", "chainstate", "sporks", "zerocoin"]:
+                for subdir in ["blocks", "chainstate", "evodb", "sporks", "zerocoin"]:
                     copy_and_overwrite(os.path.join(node_0_datadir, subdir),
                                     os.path.join(node_i_datadir, subdir))
                 initialize_datadir(cachedir, i)  # Overwrite port/rpcport in spectresecurity.conf
@@ -470,7 +501,7 @@ class SpectresecurityTestFramework():
 
             for i in range(MAX_NODES):
                 for entry in os.listdir(cache_path(i)):
-                    if entry not in ['wallet.dat', 'chainstate', 'blocks', 'sporks', 'zerocoin', 'backups']:
+                    if entry not in ['wallet.dat', 'chainstate', 'blocks', 'sporks', 'evodb', 'zerocoin', 'backups', "wallets", "llmq"]:
                         os.remove(cache_path(i, entry))
 
         def clean_cache_dir():
@@ -499,11 +530,11 @@ class SpectresecurityTestFramework():
                 if i == 0:
                     # Add .incomplete flagfile
                     # (removed at the end during clean_cache_subdir)
-                    open(os.path.join(datadir, ".incomplete"), 'a').close()
+                    open(os.path.join(datadir, ".incomplete"), 'a', encoding="utf8").close()
                 args = [os.getenv("BITCOIND", "spectresecurityd"), "-spendzeroconfchange=1", "-server", "-keypool=1",
                         "-datadir=" + datadir, "-discover=0"]
                 self.nodes.append(
-                    TestNode(i, ddir, extra_args=[], rpchost=None, timewait=None, binary=None, stderr=None,
+                    TestNode(i, ddir, extra_conf=["bind=127.0.0.1"], extra_args=[], rpchost=None, timewait=self.rpc_timewait, binary=None, stderr=None,
                              mocktime=self.mocktime, coverage_dir=None))
                 self.nodes[i].args = args
                 self.start_node(i)
@@ -525,7 +556,7 @@ class SpectresecurityTestFramework():
             clean_cache_subdir(ddir)
 
         def generate_pow_cache():
-            ### POW Cache ###
+            # POW Cache
             # Create a 200-block-long chain; each of the 4 first nodes
             # gets 25 mature blocks and 25 immature.
             # Note: To preserve compatibility with older versions of
@@ -550,7 +581,7 @@ class SpectresecurityTestFramework():
                         self.nodes[peer].generate(1)
                         block_time += 60
                     # Must sync before next peer starts generating blocks
-                    sync_blocks(self.nodes)
+                    self.sync_blocks()
 
             # Shut them down, and clean up cache directories:
             self.log.info("Stopping nodes")
@@ -586,12 +617,10 @@ class SpectresecurityTestFramework():
         for i in range(self.num_nodes):
             initialize_datadir(self.options.tmpdir, i)
 
-
-    ### SPECTRESECURITY Specific TestFramework ###
-    ###################################
+    # SPECTRESECURITY Specific TestFramework
     def init_dummy_key(self):
-        self.DUMMY_KEY = CECKey()
-        self.DUMMY_KEY.set_secretbytes(hash256(pack('<I', 0xffff)))
+        self.DUMMY_KEY = ECKey()
+        self.DUMMY_KEY.generate()
 
     def get_prevouts(self, node_id, utxo_list):
         """ get prevouts (map) for each utxo in a list
@@ -640,7 +669,7 @@ class SpectresecurityTestFramework():
             prevout.deserialize_uniqueness(BytesIO(uniqueness))
             tx = create_transaction_from_outpoint(prevout, b"", value_out, scriptPubKey)
             # sign tx
-            raw_spend = rpc_conn.signrawtransaction(bytes_to_hex_str(tx.serialize()))['hex']
+            raw_spend = rpc_conn.signrawtransaction(tx.serialize().hex())['hex']
             # add signed tx to the list
             signed_tx = CTransaction()
             signed_tx.from_hex(raw_spend)
@@ -675,7 +704,7 @@ class SpectresecurityTestFramework():
                                     If empty string, it will be used the pk from the stake input
                                     (dumping the sk from rpc_conn). If None, then the DUMMY_KEY will be used.
                  vtx:               ([CTransaction] list) transactions to add to block.vtx
-                 fDoubleSpend:      (bool) wether any tx in vtx is allowed to spend the coinstake input
+                 fDoubleSpend:      (bool) whether any tx in vtx is allowed to spend the coinstake input
         :return: block:             (CBlock) block produced, must be manually relayed
         """
         assert_greater_than(len(self.nodes), node_id)
@@ -694,7 +723,7 @@ class SpectresecurityTestFramework():
         # Find valid kernel hash - iterates stakeableUtxos, then block.nTime
         block.solve_stake(stakeableUtxos, int(prevModifier, 16))
 
-        block_sig_key = CECKey()
+        block_sig_key = ECKey()
 
         coinstakeTx_unsigned = CTransaction()
         prevout = COutPoint()
@@ -710,21 +739,20 @@ class SpectresecurityTestFramework():
                 self.init_dummy_key()
             block_sig_key = self.DUMMY_KEY
             # replace coinstake output script
-            coinstakeTx_unsigned.vout[1].scriptPubKey = CScript([block_sig_key.get_pubkey(), OP_CHECKSIG])
+            coinstakeTx_unsigned.vout[1].scriptPubKey = CScript([block_sig_key.get_pubkey().get_bytes(), OP_CHECKSIG])
         else:
-            if privKeyWIF == None:
+            if privKeyWIF is None:
                 # Use pk of the input. Ask sk from rpc_conn
                 rawtx = rpc_conn.getrawtransaction('{:064x}'.format(prevout.hash), True)
                 privKeyWIF = rpc_conn.dumpprivkey(rawtx["vout"][prevout.n]["scriptPubKey"]["addresses"][0])
             # Use the provided privKeyWIF (cold staking).
             # export the corresponding private key to sign block
             privKey, compressed = wif_to_privkey(privKeyWIF)
-            block_sig_key.set_compressed(compressed)
-            block_sig_key.set_secretbytes(bytes.fromhex(privKey))
+            block_sig_key.set(bytes.fromhex(privKey), compressed)
 
         # Sign coinstake TX and add it to the block
         stake_tx_signed_raw_hex = rpc_conn.signrawtransaction(
-            bytes_to_hex_str(coinstakeTx_unsigned.serialize()))['hex']
+            coinstakeTx_unsigned.serialize().hex())['hex']
 
         # Add coinstake to the block
         coinstakeTx = CTransaction()
@@ -751,9 +779,11 @@ class SpectresecurityTestFramework():
             stakeableUtxos,
             btime=None,
             privKeyWIF=None,
-            vtx=[],
+            vtx=None,
             fDoubleSpend=False):
         """ Calls stake_block appending to the current tip"""
+        if vtx is None:
+            vtx = []
         assert_greater_than(len(self.nodes), node_id)
         saplingActive = self.nodes[node_id].getblockchaininfo()['upgrades']['v5 shield']['status'] == 'active'
         blockVersion = 8 if saplingActive else 7
@@ -961,7 +991,9 @@ class SpectresecurityTestFramework():
             raise AssertionError("Unable to complete mnsync: %s" % str(synced))
 
 
-    def wait_until_mn_status(self, status, mnTxHash, _timeout, orEmpty=False, with_ping_mns=[]):
+    def wait_until_mn_status(self, status, mnTxHash, _timeout, orEmpty=False, with_ping_mns=None):
+        if with_ping_mns is None:
+            with_ping_mns = []
         nodes_status = [None] * self.num_nodes
 
         def node_synced(i):
@@ -988,46 +1020,126 @@ class SpectresecurityTestFramework():
             raise AssertionError(strErr)
 
 
-    def wait_until_mn_enabled(self, mnTxHash, _timeout, _with_ping_mns=[]):
+    def wait_until_mn_enabled(self, mnTxHash, _timeout, _with_ping_mns=None):
+        if _with_ping_mns is None:
+            _with_ping_mns = []
         self.wait_until_mn_status("ENABLED", mnTxHash, _timeout, with_ping_mns=_with_ping_mns)
 
 
-    def wait_until_mn_preenabled(self, mnTxHash, _timeout, _with_ping_mns=[]):
+    def wait_until_mn_preenabled(self, mnTxHash, _timeout, _with_ping_mns=None):
+        if _with_ping_mns is None:
+            _with_ping_mns = []
         self.wait_until_mn_status("PRE_ENABLED", mnTxHash, _timeout, with_ping_mns=_with_ping_mns)
 
 
-    def wait_until_mn_vinspent(self, mnTxHash, _timeout, _with_ping_mns=[]):
+    def wait_until_mn_vinspent(self, mnTxHash, _timeout, _with_ping_mns=None):
+        if _with_ping_mns is None:
+            _with_ping_mns = []
         self.wait_until_mn_status("VIN_SPENT", mnTxHash, _timeout, orEmpty=True, with_ping_mns=_with_ping_mns)
 
 
     def controller_start_masternode(self, mnOwner, masternodeAlias):
-        ret = mnOwner.startmasternode("alias", "false", masternodeAlias, True)
+        ret = mnOwner.startmasternode("alias", False, masternodeAlias, True)
         assert_equal(ret["result"], "success")
+        time.sleep(1)
+
+
+    def controller_start_masternodes(self, mnOwner, aliases=None):
+        if aliases is None:
+            aliases = []
+        ret = mnOwner.startmasternode(set="all", lock_wallet=False, reload_conf=True)
+        for i in range(len(aliases)):
+            assert_equal(ret["detail"][i]["alias"], aliases[i])
+            assert_equal(ret["detail"][i]["result"], "success")
         time.sleep(1)
 
 
     def send_pings(self, mnodes):
         for node in mnodes:
-            sent = node.mnping()["sent"]
-            if sent != "YES" and "Too early to send Masternode Ping" not in sent:
-                raise AssertionError("Unable to send ping: \"sent\" = %s" % sent)
+            try:
+                node.mnping()["sent"]
+            except:
+                pass
             time.sleep(1)
 
 
     def stake_and_sync(self, node_id, num_blocks):
         for i in range(num_blocks):
             self.mocktime = self.generate_pos(node_id, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         time.sleep(1)
 
 
-    def stake_and_ping(self, node_id, num_blocks, with_ping_mns=[]):
+    def stake_and_ping(self, node_id, num_blocks, with_ping_mns=None):
         # stake blocks and send mn pings in between
+        if with_ping_mns is None:
+            with_ping_mns = []
         for i in range(num_blocks):
             self.stake_and_sync(node_id, 1)
             if len(with_ping_mns) > 0:
                 self.send_pings(with_ping_mns)
 
+    # !TODO: remove after obsoleting legacy system
+    def setupDMN(self,
+                 mnOwner,
+                 miner,
+                 mnRemotePos,
+                 strType,           # "fund"|"internal"|"external"
+                 outpoint=None):    # COutPoint, only for "external"
+        self.log.info("Creating%s proRegTx for deterministic masternode..." % (
+                      " and funding" if strType == "fFund" else ""))
+        collateralAdd = mnOwner.getnewaddress("dmn")
+        ipport = "127.0.0.1:" + str(p2p_port(mnRemotePos))
+        ownerAdd = mnOwner.getnewaddress("dmn_owner")
+        bls_keypair = mnOwner.generateblskeypair()
+        votingAdd = mnOwner.getnewaddress("dmn_voting")
+        if strType == "fund":
+            # send to the owner the collateral tx cost + some dust for the ProReg and fee
+            fundingTxId = miner.sendtoaddress(collateralAdd, Decimal('101'))
+            # confirm and verify reception
+            self.stake_and_sync(self.nodes.index(miner), 1)
+            assert_greater_than(mnOwner.getrawtransaction(fundingTxId, 1)["confirmations"], 0)
+            # create and send the ProRegTx funding the collateral
+            proTxId = mnOwner.protx_register_fund(collateralAdd, ipport, ownerAdd,
+                                                  bls_keypair["public"], votingAdd, collateralAdd)
+        elif strType == "internal":
+            mnOwner.getnewaddress("dust")
+            # send to the owner the collateral tx cost + some dust for the ProReg and fee
+            collateralTxId = miner.sendtoaddress(collateralAdd, Decimal('100'))
+            miner.sendtoaddress(collateralAdd, Decimal('1'))
+            # confirm and verify reception
+            self.stake_and_sync(self.nodes.index(miner), 1)
+            json_tx = mnOwner.getrawtransaction(collateralTxId, True)
+            collateralTxId_n = -1
+            for o in json_tx["vout"]:
+                if o["value"] == Decimal('100'):
+                    collateralTxId_n = o["n"]
+                    break
+            assert_greater_than(collateralTxId_n, -1)
+            assert_greater_than(json_tx["confirmations"], 0)
+            proTxId = mnOwner.protx_register(collateralTxId, collateralTxId_n, ipport, ownerAdd,
+                                             bls_keypair["public"], votingAdd, collateralAdd)
+        elif strType == "external":
+            self.log.info("Setting up ProRegTx with collateral externally-signed...")
+            # send the tx from the miner
+            payoutAdd = mnOwner.getnewaddress("payout")
+            register_res = miner.protx_register_prepare(outpoint.hash, outpoint.n, ipport, ownerAdd,
+                                                        bls_keypair["public"], votingAdd, payoutAdd)
+            self.log.info("ProTx prepared")
+            message_to_sign = register_res["signMessage"]
+            collateralAdd = register_res["collateralAddress"]
+            signature = mnOwner.signmessage(collateralAdd, message_to_sign)
+            self.log.info("ProTx signed")
+            proTxId = miner.protx_register_submit(register_res["tx"], signature)
+        else:
+            raise Exception("Type %s not available" % strType)
+
+        self.sync_mempools([mnOwner, miner])
+        # confirm and verify inclusion in list
+        self.stake_and_sync(self.nodes.index(miner), 1)
+        assert_greater_than(self.nodes[mnRemotePos].getrawtransaction(proTxId, 1)["confirmations"], 0)
+        assert proTxId in self.nodes[mnRemotePos].protx_list(False)
+        return proTxId, bls_keypair["secret"]
 
     def setupMasternode(self,
                         mnOwner,
@@ -1039,62 +1151,211 @@ class SpectresecurityTestFramework():
         self.log.info("adding balance to the mn owner for " + masternodeAlias + "..")
         mnAddress = mnOwner.getnewaddress(masternodeAlias)
         # send to the owner the collateral tx cost
-        collateralTxId = miner.sendtoaddress(mnAddress, Decimal('10000'))
+        collateralTxId = miner.sendtoaddress(mnAddress, Decimal('100'))
         # confirm and verify reception
         self.stake_and_sync(self.nodes.index(miner), 1)
-        assert_equal(mnOwner.getbalance(), Decimal('10000'))
-        assert_greater_than(mnOwner.getrawtransaction(collateralTxId, 1)["confirmations"], 0)
-
-        self.log.info("all good, creating masternode " + masternodeAlias + "..")
-
-        # get the collateral output using the RPC command
-        mnCollateralOutput = mnOwner.getmasternodeoutputs()[0]
-        assert_equal(mnCollateralOutput["txhash"], collateralTxId)
-        mnCollateralOutputIndex = mnCollateralOutput["outputidx"]
-
-        self.log.info("collateral accepted for "+ masternodeAlias +". Updating masternode.conf...")
-
-        # verify collateral confirmed
-        confData = masternodeAlias + " 127.0.0.1:" + str(p2p_port(mnRemotePos)) + " " + str(masternodePrivKey) + " " + str(mnCollateralOutput["txhash"]) + " " + str(mnCollateralOutputIndex)
-        destinationDirPath = mnOwnerDirPath
-        destPath = os.path.join(destinationDirPath, "masternode.conf")
-        with open(destPath, "a+") as file_object:
+        json_tx = mnOwner.getrawtransaction(collateralTxId, True)
+        collateralTxId_n = -1
+        for o in json_tx["vout"]:
+            if o["value"] == Decimal('100'):
+                collateralTxId_n = o["n"]
+                break
+        assert_greater_than(collateralTxId_n, -1)
+        assert_greater_than(json_tx["confirmations"], 0)
+        # update masternode file
+        self.log.info("collateral accepted for " + masternodeAlias + ". Updating masternode.conf...")
+        confData = "%s 127.0.0.1:%d %s %s %d" % (masternodeAlias,
+                                                 p2p_port(mnRemotePos),
+                                                 masternodePrivKey,
+                                                 collateralTxId,
+                                                 collateralTxId_n)
+        destPath = os.path.join(mnOwnerDirPath, "masternode.conf")
+        with open(destPath, "a+", encoding="utf8") as file_object:
             file_object.write("\n")
             file_object.write(confData)
 
-        # return the collateral id
-        return collateralTxId
+        # lock collateral
+        mnOwner.lockunspent(False, True, [{"txid": collateralTxId, "vout": collateralTxId_n}])
 
-### ------------------------------------------------------
+        # return the collateral outpoint
+        return COutPoint(collateralTxId, collateralTxId_n)
 
-class ComparisonTestFramework(SpectresecurityTestFramework):
-    """Test framework for doing p2p comparison testing
+    # ----- DMN setup ------
+    def connect_to_all(self, nodePos):
+        for i in range(self.num_nodes):
+            if i != nodePos and self.nodes[i] is not None:
+                connect_nodes(self.nodes[i], nodePos)
 
-    Sets up some spectresecurityd binaries:
-    - 1 binary: test binary
-    - 2 binaries: 1 test binary, 1 ref binary
-    - n>2 binaries: 1 test binary, n-1 ref binaries"""
+    def assert_equal_for_all(self, expected, func_name, *args):
+        def not_found():
+            raise Exception("function %s not found!" % func_name)
 
-    def set_test_params(self):
-        self.num_nodes = 2
-        self.setup_clean_chain = True
+        assert_equal([getattr(x, func_name, not_found)(*args) for x in self.nodes],
+                     [expected] * self.num_nodes)
 
-    def add_options(self, parser):
-        parser.add_option("--testbinary", dest="testbinary",
-                          default=os.getenv("BITCOIND", "spectresecurityd"),
-                          help="spectresecurityd binary to test")
-        parser.add_option("--refbinary", dest="refbinary",
-                          default=os.getenv("BITCOIND", "spectresecurityd"),
-                          help="spectresecurityd binary to use for reference nodes (if any)")
+    """
+    Create a ProReg tx, which has the collateral as one of its outputs
+    """
+    def protx_register_fund(self, miner, controller, dmn, collateral_addr, op_rew=None):
+        # send to the owner the collateral tx + some dust for the ProReg and fee
+        funding_txid = miner.sendtoaddress(collateral_addr, Decimal('101'))
+        # confirm and verify reception
+        miner.generate(1)
+        self.sync_blocks([miner, controller])
+        assert_greater_than(controller.getrawtransaction(funding_txid, True)["confirmations"], 0)
+        # create and send the ProRegTx funding the collateral
+        if op_rew is None:
+            dmn.proTx = controller.protx_register_fund(collateral_addr, dmn.ipport, dmn.owner,
+                                                       dmn.operator_pk, dmn.voting, dmn.payee)
+        else:
+            dmn.proTx = controller.protx_register_fund(collateral_addr, dmn.ipport, dmn.owner,
+                                                       dmn.operator_pk, dmn.voting, dmn.payee,
+                                                       op_rew["reward"], op_rew["address"])
+        dmn.collateral = COutPoint(int(dmn.proTx, 16),
+                                   get_collateral_vout(controller.getrawtransaction(dmn.proTx, True)))
 
-    def setup_network(self):
-        extra_args = [['-whitelist=127.0.0.1']] * self.num_nodes
-        if hasattr(self, "extra_args"):
-            extra_args = self.extra_args
-        self.add_nodes(self.num_nodes, extra_args,
-                       binary=[self.options.testbinary] +
-                       [self.options.refbinary] * (self.num_nodes - 1))
-        self.start_nodes()
+    """
+    Create a ProReg tx, which references an 100 SSMN UTXO as collateral.
+    The controller node owns the collateral and creates the ProReg tx.
+    """
+    def protx_register(self, miner, controller, dmn, collateral_addr):
+        # send to the owner the exact collateral tx amount
+        funding_txid = miner.sendtoaddress(collateral_addr, Decimal('100'))
+        # send another output to be used for the fee of the proReg tx
+        miner.sendtoaddress(collateral_addr, Decimal('1'))
+        # confirm and verify reception
+        miner.generate(1)
+        self.sync_blocks([miner, controller])
+        json_tx = controller.getrawtransaction(funding_txid, True)
+        assert_greater_than(json_tx["confirmations"], 0)
+        # create and send the ProRegTx
+        dmn.collateral = COutPoint(int(funding_txid, 16), get_collateral_vout(json_tx))
+        dmn.proTx = controller.protx_register(funding_txid, dmn.collateral.n, dmn.ipport, dmn.owner,
+                                              dmn.operator_pk, dmn.voting, dmn.payee)
+
+    """
+    Create a ProReg tx, referencing a collateral signed externally (eg. HW wallets).
+    Here the controller node owns the collateral (and signs), but the miner creates the ProReg tx.
+    """
+    def protx_register_ext(self, miner, controller, dmn, outpoint, fSubmit):
+        # send to the owner the collateral tx if the outpoint is not specified
+        if outpoint is None:
+            funding_txid = miner.sendtoaddress(controller.getnewaddress("collateral"), Decimal('100'))
+            # confirm and verify reception
+            miner.generate(1)
+            self.sync_blocks([miner, controller])
+            json_tx = controller.getrawtransaction(funding_txid, True)
+            assert_greater_than(json_tx["confirmations"], 0)
+            outpoint = COutPoint(int(funding_txid, 16), get_collateral_vout(json_tx))
+        dmn.collateral = outpoint
+        # Prepare the message to be signed externally by the owner of the collateral (the controller)
+        reg_tx = miner.protx_register_prepare("%064x" % outpoint.hash, outpoint.n, dmn.ipport, dmn.owner,
+                                              dmn.operator_pk, dmn.voting, dmn.payee)
+        sig = controller.signmessage(reg_tx["collateralAddress"], reg_tx["signMessage"])
+        if fSubmit:
+            dmn.proTx = miner.protx_register_submit(reg_tx["tx"], sig)
+        else:
+            return reg_tx["tx"], sig
+
+    """ Create and register new deterministic masternode
+    :param   idx:              (int) index of the (remote) node in self.nodes
+             miner_idx:        (int) index of the miner in self.nodes
+             controller_idx:   (int) index of the controller in self.nodes
+             strType:          (string) "fund"|"internal"|"external"
+             payout_addr:      (string) payee address. If not specified, reuse the collateral address.
+             outpoint:         (COutPoint) collateral outpoint to be used with "external".
+                                 It must be owned by the controller (proTx is sent from the miner).
+                                 If not provided, a new utxo is created, sending it from the miner.
+             op_blskeys:      (list of strings) List with two entries, operator public (0) and private (1) key.
+                                 If not provided, a new address-key pair is generated.
+    :return: dmn:              (Masternode) the deterministic masternode object
+    """
+    def register_new_dmn(self, idx, miner_idx, controller_idx, strType,
+                         payout_addr=None, outpoint=None, op_blskeys=None):
+        # Prepare remote node
+        assert idx != miner_idx
+        assert idx != controller_idx
+        miner_node = self.nodes[miner_idx]
+        controller_node = self.nodes[controller_idx]
+        mn_node = self.nodes[idx]
+
+        # Generate ip and addresses/keys
+        collateral_addr = controller_node.getnewaddress("mncollateral-%d" % idx)
+        if payout_addr is None:
+            payout_addr = collateral_addr
+        dmn = create_new_dmn(idx, controller_node, payout_addr, op_blskeys)
+
+        # Create ProRegTx
+        self.log.info("Creating%s proRegTx for deterministic masternode idx=%d..." % (
+            " and funding" if strType == "fund" else "", idx))
+        if strType == "fund":
+            self.protx_register_fund(miner_node, controller_node, dmn, collateral_addr)
+        elif strType == "internal":
+            self.protx_register(miner_node, controller_node, dmn, collateral_addr)
+        elif strType == "external":
+            self.protx_register_ext(miner_node, controller_node, dmn, outpoint, True)
+        else:
+            raise Exception("Type %s not available" % strType)
+        time.sleep(1)
+        self.sync_mempools([miner_node, controller_node])
+
+        # confirm and verify inclusion in list
+        miner_node.generate(1)
+        self.sync_blocks()
+        json_tx = mn_node.getrawtransaction(dmn.proTx, 1)
+        assert_greater_than(json_tx["confirmations"], 0)
+        assert dmn.proTx in mn_node.protx_list(False)
+
+        # check coin locking
+        assert is_coin_locked_by(controller_node, dmn.collateral)
+
+        # check json payload against local dmn object
+        self.check_proreg_payload(dmn, json_tx)
+
+        return dmn
+
+    def check_mn_list_on_node(self, idx, mns):
+        self.nodes[idx].syncwithvalidationinterfacequeue()
+        mnlist = self.nodes[idx].listmasternodes()
+        if len(mnlist) != len(mns):
+            mnlist_l = [[x['proTxHash'], x['dmnstate']['service']] for x in mnlist]
+            mns_l = [[x.proTx, x.ipport] for x in mns]
+            strErr = ""
+            for x in [x for x in mnlist_l if x not in mns_l]:
+                strErr += "Mn %s is not expected\n" % str(x)
+            for x in [x for x in mns_l if x not in mnlist_l]:
+                strErr += "Expect Mn %s not found\n" % str(x)
+            raise Exception("Invalid mn list on node %d:\n%s" % (idx, strErr))
+        protxs = {x["proTxHash"]: x for x in mnlist}
+        for mn in mns:
+            if mn.proTx not in protxs:
+                raise Exception("ProTx for mn %d (%s) not found in the list of node %d" % (mn.idx, mn.proTx, idx))
+            mn2 = protxs[mn.proTx]
+            collateral = mn.collateral.to_json()
+            assert_equal(mn.owner, mn2["dmnstate"]["ownerAddress"])
+            assert_equal(mn.operator_pk, mn2["dmnstate"]["operatorPubKey"])
+            assert_equal(mn.voting, mn2["dmnstate"]["votingAddress"])
+            assert_equal(mn.ipport, mn2["dmnstate"]["service"])
+            assert_equal(mn.payee, mn2["dmnstate"]["payoutAddress"])
+            assert_equal(collateral["txid"], mn2["collateralHash"])
+            assert_equal(collateral["vout"], mn2["collateralIndex"])
+
+    def check_proreg_payload(self, dmn, json_tx):
+        assert "payload" in json_tx
+        # null hash if funding collateral
+        collateral_hash = 0 if int(json_tx["txid"], 16) == dmn.collateral.hash \
+                            else dmn.collateral.hash
+        pl = json_tx["payload"]
+        assert_equal(pl["version"], 1)
+        assert_equal(pl["collateralHash"], "%064x" % collateral_hash)
+        assert_equal(pl["collateralIndex"], dmn.collateral.n)
+        assert_equal(pl["service"], dmn.ipport)
+        assert_equal(pl["ownerAddress"], dmn.owner)
+        assert_equal(pl["votingAddress"], dmn.voting)
+        assert_equal(pl["operatorPubKey"], dmn.operator_pk)
+        assert_equal(pl["payoutAddress"], dmn.payee)
+
+# ------------------------------------------------------
 
 class SkipTest(Exception):
     """This exception is raised to skip a test"""
@@ -1106,16 +1367,286 @@ class SkipTest(Exception):
 SpectresecurityTestFramework extensions
 '''
 
+class ExpectedDKGMessages:
+    def __init__(self,
+                 s_contrib=True, s_complaint=False, s_justif=False, s_commit=True,
+                 r_contrib=3, r_complaint=0, r_justif=0, r_commit=3):
+        self.sent_contrib = s_contrib
+        self.sent_complaint = s_complaint
+        self.sent_justif = s_justif
+        self.sent_commit = s_commit
+        self.recv_contrib = r_contrib
+        self.recv_complaint = r_complaint
+        self.recv_justif = r_justif
+        self.recv_commit = r_commit
+
+class SpectresecurityDMNTestFramework(SpectresecurityTestFramework):
+
+    def set_base_test_params(self):
+        # 1 miner, 1 controller, 6 remote mns
+        self.num_nodes = 8
+        self.minerPos = 0
+        self.controllerPos = 1
+        self.setup_clean_chain = True
+
+    def add_new_dmn(self, strType, op_keys=None, from_out=None):
+        self.mns.append(self.register_new_dmn(2 + len(self.mns),
+                                             self.minerPos,
+                                             self.controllerPos,
+                                             strType,
+                                             outpoint=from_out,
+                                             op_blskeys=op_keys))
+
+    def check_mn_list(self):
+        for i in range(self.num_nodes):
+            self.check_mn_list_on_node(i, self.mns)
+        self.log.info("Deterministic list contains %d masternodes for all peers." % len(self.mns))
+
+    def check_mn_enabled_count(self, enabled, total):
+        for node in self.nodes:
+            node_count = node.getmasternodecount()
+            assert_equal(node_count['enabled'], enabled)
+            assert_equal(node_count['total'], total)
+
+    def wait_until_mnsync_completed(self):
+        SYNC_FINISHED = [999] * self.num_nodes
+        synced = [-1] * self.num_nodes
+        timeout = time.time() + 120
+        while synced != SYNC_FINISHED and time.time() < timeout:
+            synced = [node.mnsync("status")["RequestedMasternodeAssets"]
+                      for node in self.nodes]
+            if synced != SYNC_FINISHED:
+                time.sleep(5)
+        if synced != SYNC_FINISHED:
+            raise AssertionError("Unable to complete mnsync: %s" % str(synced))
+
+    def setup_test(self):
+        self.mns = []
+        self.disable_mocktime()
+        connect_nodes_clique(self.nodes)
+
+        # Enforce mn payments and reject legacy mns at block 131
+        self.activate_spork(0, "SPORK_8_MASTERNODE_PAYMENT_ENFORCEMENT")
+        assert_equal("success", self.set_spork(self.minerPos, "SPORK_21_LEGACY_MNS_MAX_HEIGHT", 130))
+        time.sleep(1)
+        assert_equal([130] * self.num_nodes, [self.get_spork(x, "SPORK_21_LEGACY_MNS_MAX_HEIGHT")
+                                              for x in range(self.num_nodes)])
+
+        # Enforce chainlocks activation at block 131
+        assert_equal("success", self.set_spork(self.minerPos, "SPORK_23_CHAINLOCKS_ENFORCEMENT", 130))
+        time.sleep(1)
+        assert_equal([130] * self.num_nodes, [self.get_spork(x, "SPORK_23_CHAINLOCKS_ENFORCEMENT")
+                                              for x in range(self.num_nodes)])
+
+        # Mine 130 blocks
+        self.log.info("Mining...")
+        self.nodes[self.minerPos].generate(10)
+        self.sync_blocks()
+        self.wait_until_mnsync_completed()
+        self.nodes[self.minerPos].generate(120)
+        self.sync_blocks()
+        self.assert_equal_for_all(130, "getblockcount")
+
+        # enabled/total masternodes: 0/0
+        self.check_mn_enabled_count(0, 0)
+
+        # Create 6 DMNs and init the remote nodes
+        self.log.info("Initializing masternodes...")
+        for _ in range(2):
+            self.add_new_dmn("internal")
+            self.add_new_dmn("external")
+            self.add_new_dmn("fund")
+        assert_equal(len(self.mns), 6)
+        for mn in self.mns:
+            self.nodes[mn.idx].initmasternode(mn.operator_sk)
+            time.sleep(1)
+        self.nodes[self.minerPos].generate(1)
+        self.sync_blocks()
+
+        # enabled/total masternodes: 6/6
+        self.check_mn_enabled_count(6, 6)
+        self.check_mn_list()
+
+        # Check status from remote nodes
+        assert_equal([self.nodes[idx].getmasternodestatus()['status'] for idx in range(2, self.num_nodes)],
+                     ["Ready"] * (self.num_nodes - 2))
+        self.log.info("All masternodes ready.")
+
+    # LLMQ functions
+
+    def get_quorum_connections(self, node, members):
+        conn = []
+        for peer in [p for p in node.getpeerinfo() if p["masternode"]]:
+            x = [m for m in members if m.proTx == peer["verif_mn_proreg_tx_hash"]]
+            if len(x) > 0:
+                conn.append(x[0].idx)
+        return conn
+
+    def wait_for_mn_connections(self, members):
+        def count_mn_conn(n):
+            return len(self.get_quorum_connections(n, members))
+        ql = len(members)
+        wait_until(lambda: [count_mn_conn(self.nodes[mn.idx]) for mn in members] == [ql - 1] * ql)
+        for mn in members:
+            conn = self.get_quorum_connections(self.nodes[mn.idx], members)
+            self.log.info("Authenticated connections to node %d: %s" % (mn.idx, conn))
+
+    def wait_for_dkg_phase(self, phase, quorum_hash, quorum_height, members_online, expected_msgs_list):
+        assert_equal(len(members_online), len(expected_msgs_list))
+
+        def check_phase():
+            status = [self.nodes[mn.idx].quorumdkgstatus()["session"]
+                      for mn in members_online]
+            for i, s in enumerate(status):
+                if "llmq_test" not in s:
+                    return False
+                s = s["llmq_test"]
+                msgs = expected_msgs_list[i]
+                if (s["quorumHash"] != quorum_hash
+                        or s["quorumHeight"] != quorum_height
+                        or s["phase"] != phase
+                        or s["sentContributions"] != (phase != 1 and msgs.sent_contrib)
+                        or s["sentComplaint"] != (phase > 2 and msgs.sent_complaint)
+                        or s["sentJustification"] != (phase > 3 and msgs.sent_justif)
+                        or s["sentPrematureCommitment"] != (phase > 4 and msgs.sent_commit)
+                        or s["receivedContributions"] != (0 if phase == 1 else msgs.recv_contrib)
+                        or s["receivedComplaints"] != (0 if phase <= 2 else msgs.recv_complaint)
+                        or s["receivedJustifications"] != (0 if phase <= 3 else msgs.recv_justif)
+                        or s["receivedPrematureCommitments"] != (0 if phase <= 4 else msgs.recv_commit)):
+                    return False
+            return True
+
+        timeout = time.time() + 30
+        while time.time() < timeout:
+            if check_phase():
+                return  # all good
+            time.sleep(6)
+
+        # Timeout: print the cause
+        self.log.error("Cannot reach phase %d" % phase)
+        for i, mo in enumerate(members_online):
+            msgs = expected_msgs_list[i]
+            self.log.error("Checking node %d..." % mo.idx)
+            conn = self.get_quorum_connections(self.nodes[mo.idx], members_online)
+            self.log.error("Connected to: %s" % str(conn))
+            fs = self.nodes[mo.idx].quorumdkgstatus()["session"]
+            assert "llmq_test" in fs
+            fs = fs["llmq_test"]
+            assert_equal(fs["quorumHash"], quorum_hash)
+            assert_equal(fs["quorumHeight"], quorum_height)
+            assert_equal(fs["phase"], phase)
+            assert_equal(fs["sentContributions"], (phase != 1 and msgs.sent_contrib))
+            assert_equal(fs["sentComplaint"], (phase > 2 and msgs.sent_complaint))
+            assert_equal(fs["sentJustification"], (phase > 3 and msgs.sent_justif))
+            assert_equal(fs["sentPrematureCommitment"], (phase > 4 and msgs.sent_commit))
+            assert_equal(fs["receivedContributions"], (0 if phase == 1 else msgs.recv_contrib))
+            assert_equal(fs["receivedComplaints"], (0 if phase <= 2 else msgs.recv_complaint))
+            assert_equal(fs["receivedJustifications"], (0 if phase <= 3 else msgs.recv_justif))
+            assert_equal(fs["receivedPrematureCommitments"], (0 if phase <= 4 else msgs.recv_commit))
+
+    def get_quorum_members(self, quorum_hash):
+        members = []
+        # preserve getquorummembers order
+        for protx in self.nodes[self.minerPos].getquorummembers(100, quorum_hash):
+            members.append(next(mn for mn in self.mns if mn.proTx == protx))
+        return members
+
+    def check_final_commitment(self, qfc, valid, signers):
+        signersCount = 0
+        signersBitStr = 0
+        for i, s in enumerate(signers):
+            signersCount += s
+            signersBitStr += (s << i)
+        signersBitStr = "0%d" % signersBitStr
+        validCount = 0
+        validBitStr = 0
+        for i, s in enumerate(valid):
+            validCount += s
+            validBitStr += (s << i)
+        validBitStr = "0%d" % validBitStr
+        assert_equal(qfc['version'], 1)
+        assert_equal(qfc['llmqType'], 100)
+        assert_equal(qfc['signersCount'], signersCount)
+        assert_equal(qfc['signers'], signersBitStr)
+        assert_equal(qfc['validMembersCount'], validCount)
+        assert_equal(qfc['validMembers'], validBitStr)
+
+    """
+    Returns pair (qfc, bad_member)
+    qfc        : quorum final commitment json object
+    bad_member : Masternode object for non participating node
+                 (or None if all members participated)
+    """
+    def mine_quorum(self, invalidate_func=None, invalidated_idx=None, skip_bad_member_sync=False,
+                    expected_messages=None):
+        if expected_messages is None:
+            expected_messages = [ExpectedDKGMessages() for _ in range(3)]
+        nodes_to_sync = self.nodes.copy()
+        if invalidated_idx is not None:
+            assert invalidate_func is None
+            if skip_bad_member_sync:
+                nodes_to_sync.pop(invalidated_idx)
+        miner = self.nodes[self.minerPos]
+        session_blocks = miner.getblockcount() % 20
+        if session_blocks != 0:
+            miner.generate(20 - session_blocks)
+            self.sync_blocks(nodes_to_sync)
+        quorum_height = miner.getblockcount()
+        self.log.info("New DKG starts at block %d..." % quorum_height)
+        quorum_hash = miner.getblockhash(quorum_height)
+        members = self.get_quorum_members(quorum_hash)
+        self.log.info("members: %s" % str([m.idx for m in members]))
+        bad_member = None
+        if invalidate_func is not None:
+            assert invalidated_idx is None
+            bad_member = members[-1]
+            invalidate_func(self.nodes[bad_member.idx])
+            if skip_bad_member_sync:
+                nodes_to_sync.pop(bad_member.idx)
+        elif invalidated_idx in [m.idx for m in members]:
+            bad_member = next(m for m in members if m.idx == invalidated_idx)
+        if bad_member is not None:
+            if skip_bad_member_sync:
+                members.remove(bad_member)
+            self.log.info("Node %d selected as bad" % bad_member.idx)
+        else:
+            # No bad member selected with invalidated_idx set (the invalidated
+            # masternode is not part of the current quorum): reset expected messages
+            if invalidated_idx is not None:
+                expected_messages = [ExpectedDKGMessages() for _ in range(len(members))]
+
+        self.wait_for_mn_connections(members)
+        phase_string = [
+            "1 (Initialization)",
+            "2 (Contribution)",
+            "3 (Complaining)",
+            "4 (Justification)",
+            "5 (Commitment/Finalization)",
+            "6 (Mining)"
+        ]
+        for phase in range(1, 7):
+            self.log.info("Phase %s - block %d" % (phase_string[phase-1], miner.getblockcount()))
+            self.wait_for_dkg_phase(phase,
+                                    quorum_hash,
+                                    quorum_height,
+                                    members,
+                                    expected_messages)
+            miner.generate(2 if phase != 6 else 1)
+            self.sync_all(nodes_to_sync)
+            time.sleep(1 if phase != 5 else 2)  # sleep a bit more during finalization
+        assert_equal(quorum_height + 11, miner.getblockcount())
+        qfc = miner.getminedcommitment(100, quorum_hash)
+        comm_height = miner.getblock(qfc['block_hash'], True)['height']
+        assert_equal(comm_height, quorum_height + 11)
+        self.log.info("Final commitment correctly mined on chain")
+        return qfc, bad_member
+
+# !TODO: remove after obsoleting legacy system
 class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
 
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.num_nodes = 5
-        self.extra_args = [[],
-                           ["-listen", "-externalip=127.0.0.1"],
-                           [],
-                           ["-listen", "-externalip=127.0.0.1"],
-                           ["-sporkkey=932HEevBSujW2ud7RfB1YF91AFygbBRQj3de3LyaCRqNzKKgWXi"]]
+        self.num_nodes = 6
         self.enable_mocktime()
 
         self.ownerOnePos = 0
@@ -1123,6 +1654,12 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
         self.ownerTwoPos = 2
         self.remoteTwoPos = 3
         self.minerPos = 4
+        self.remoteDMN1Pos = 5
+
+        self.extra_args = [["-nuparams=v5_shield:249", "-nuparams=SPECTRESECURITY_v5.5:250", "-nuparams=v6_evo:250", "-whitelist=127.0.0.1"]] * self.num_nodes
+        for i in [self.remoteOnePos, self.remoteTwoPos, self.remoteDMN1Pos]:
+            self.extra_args[i] += ["-listen", "-externalip=127.0.0.1"]
+        self.extra_args[self.minerPos].append("-sporkkey=932HEevBSujW2ud7RfB1YF91AFygbBRQj3de3LyaCRqNzKKgWXi")
 
         self.masternodeOneAlias = "mnOne"
         self.masternodeTwoAlias = "mntwo"
@@ -1130,36 +1667,41 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
         self.mnOnePrivkey = "9247iC59poZmqBYt9iDh9wDam6v9S1rW5XekjLGyPnDhrDkP4AK"
         self.mnTwoPrivkey = "92Hkebp3RHdDidGZ7ARgS4orxJAGyFUPDXNqtsYsiwho1HGVRbF"
 
-        # Updated in setup_2_masternodes_network() to be called at the start of run_test
+        # Updated in setup_3_masternodes_network() to be called at the start of run_test
         self.ownerOne = None        # self.nodes[self.ownerOnePos]
         self.remoteOne = None       # self.nodes[self.remoteOnePos]
         self.ownerTwo = None        # self.nodes[self.ownerTwoPos]
         self.remoteTwo = None       # self.nodes[self.remoteTwoPos]
         self.miner = None           # self.nodes[self.minerPos]
-        self.mnOneTxHash = ""
-        self.mnTwoTxHash = ""
+        self.remoteDMN1 = None       # self.nodes[self.remoteDMN1Pos]
+        self.mnOneCollateral = COutPoint()
+        self.mnTwoCollateral = COutPoint()
+        self.proRegTx1 = None       # hash of provider-register-tx
 
 
     def send_3_pings(self):
+        mns = [self.remoteOne, self.remoteTwo]
         self.advance_mocktime(30)
-        self.send_pings([self.remoteOne, self.remoteTwo])
-        self.stake(1, [self.remoteOne, self.remoteTwo])
+        self.send_pings(mns)
+        self.stake(1, mns)
         self.advance_mocktime(30)
-        self.send_pings([self.remoteOne, self.remoteTwo])
+        self.send_pings(mns)
         time.sleep(2)
 
-    def stake(self, num_blocks, with_ping_mns=[]):
+    def stake(self, num_blocks, with_ping_mns=None):
+        if with_ping_mns is None:
+            with_ping_mns = []
         self.stake_and_ping(self.minerPos, num_blocks, with_ping_mns)
 
     def controller_start_all_masternodes(self):
         self.controller_start_masternode(self.ownerOne, self.masternodeOneAlias)
         self.controller_start_masternode(self.ownerTwo, self.masternodeTwoAlias)
-        self.wait_until_mn_preenabled(self.mnOneTxHash, 40)
-        self.wait_until_mn_preenabled(self.mnTwoTxHash, 40)
+        self.wait_until_mn_preenabled(self.mnOneCollateral.hash, 40)
+        self.wait_until_mn_preenabled(self.mnTwoCollateral.hash, 40)
         self.log.info("masternodes started, waiting until both get enabled..")
         self.send_3_pings()
-        self.wait_until_mn_enabled(self.mnOneTxHash, 120, [self.remoteOne, self.remoteTwo])
-        self.wait_until_mn_enabled(self.mnTwoTxHash, 120, [self.remoteOne, self.remoteTwo])
+        self.wait_until_mn_enabled(self.mnOneCollateral.hash, 120, [self.remoteOne, self.remoteTwo])
+        self.wait_until_mn_enabled(self.mnTwoCollateral.hash, 120, [self.remoteOne, self.remoteTwo])
         self.log.info("masternodes enabled and running properly!")
 
     def advance_mocktime_and_stake(self, secs_to_add):
@@ -1167,26 +1709,27 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
         self.mocktime = self.generate_pos(self.minerPos, self.mocktime)
         time.sleep(2)
 
-    def setup_2_masternodes_network(self):
+    def setup_3_masternodes_network(self):
         self.ownerOne = self.nodes[self.ownerOnePos]
         self.remoteOne = self.nodes[self.remoteOnePos]
         self.ownerTwo = self.nodes[self.ownerTwoPos]
         self.remoteTwo = self.nodes[self.remoteTwoPos]
         self.miner = self.nodes[self.minerPos]
-        ownerOneDir = os.path.join(self.options.tmpdir, "node0")
-        ownerTwoDir = os.path.join(self.options.tmpdir, "node2")
+        self.remoteDMN1 = self.nodes[self.remoteDMN1Pos]
+        ownerOneDir = os.path.join(self.options.tmpdir, "node%d" % self.ownerOnePos)
+        ownerTwoDir = os.path.join(self.options.tmpdir, "node%d" % self.ownerTwoPos)
 
-        self.log.info("generating 259 blocks..")
+        self.log.info("generating 256 blocks..")
         # First mine 250 PoW blocks
         for i in range(250):
             self.mocktime = self.generate_pow(self.minerPos, self.mocktime)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         # Then start staking
-        self.stake(9)
+        self.stake(6)
 
         self.log.info("masternodes setup..")
         # setup first masternode node, corresponding to nodeOne
-        self.mnOneTxHash = self.setupMasternode(
+        self.mnOneCollateral = self.setupMasternode(
             self.ownerOne,
             self.miner,
             self.masternodeOneAlias,
@@ -1194,13 +1737,20 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
             self.remoteOnePos,
             self.mnOnePrivkey)
         # setup second masternode node, corresponding to nodeTwo
-        self.mnTwoTxHash = self.setupMasternode(
+        self.mnTwoCollateral = self.setupMasternode(
             self.ownerTwo,
             self.miner,
             self.masternodeTwoAlias,
             os.path.join(ownerTwoDir, "regtest"),
             self.remoteTwoPos,
             self.mnTwoPrivkey)
+        # setup deterministic masternode
+        self.proRegTx1, self.dmn1Privkey = self.setupDMN(
+            self.ownerOne,
+            self.miner,
+            self.remoteDMN1Pos,
+            "fund"
+        )
 
         self.log.info("masternodes setup completed, initializing them..")
 
@@ -1212,6 +1762,7 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
         remoteTwoPort = p2p_port(self.remoteTwoPos)
         self.remoteOne.initmasternode(self.mnOnePrivkey, "127.0.0.1:"+str(remoteOnePort))
         self.remoteTwo.initmasternode(self.mnTwoPrivkey, "127.0.0.1:"+str(remoteTwoPort))
+        self.remoteDMN1.initmasternode(self.dmn1Privkey)
 
         # wait until mnsync complete on all nodes
         self.stake(1)
@@ -1220,3 +1771,16 @@ class SpectresecurityTier2TestFramework(SpectresecurityTestFramework):
 
         # Now everything is set, can start both masternodes
         self.controller_start_all_masternodes()
+
+    def spend_collateral(self, mnOwner, collateralOutpoint, miner):
+        send_value = satoshi_round(100 - 0.001)
+        inputs = [{'txid': collateralOutpoint.hash, 'vout': collateralOutpoint.n}]
+        outputs = {}
+        outputs[mnOwner.getnewaddress()] = float(send_value)
+        rawtx = mnOwner.createrawtransaction(inputs, outputs)
+        signedtx = mnOwner.signrawtransaction(rawtx)
+        txid = miner.sendrawtransaction(signedtx['hex'])
+        self.sync_mempools()
+        self.log.info("Collateral spent in %s" % txid)
+        self.send_pings([self.remoteTwo])
+        self.stake(1, [self.remoteTwo])

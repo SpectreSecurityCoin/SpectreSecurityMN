@@ -62,8 +62,7 @@ First, install the general dependencies:
     sudo apt install build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git
 
 A host toolchain (`build-essential`) is necessary because some dependency
-packages (such as `protobuf`) need to build host utilities that are used in the
-build process.
+packages need to build host utilities that are used in the build process.
 
 See [dependencies.md](dependencies.md) for a complete overview.
 
@@ -105,7 +104,7 @@ Build using:
     make HOST=x86_64-w64-mingw32
     cd ..
     ./autogen.sh # not required when building from tarball
-    CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/
+    CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=/ --disable-online-rust
     make
     sudo bash -c "echo 1 > /proc/sys/fs/binfmt_misc/status" # Enable WSL support for Win32 applications.
 

@@ -1,6 +1,6 @@
 // Copyright (c) 2011-2014 The Bitcoin developers
 // Copyright (c) 2014-2016 The Dash developers
-// Copyright (c) 2016-2020 The SPECTRESECURITY developers
+// Copyright (c) 2016-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,8 +28,8 @@ public:
     {
     }
 
-    enum Status {
-        Confirmed, /**< Have 6 or more confirmations (normal tx) or fully mature (mined tx) **/
+    enum Status : uint16_t{
+        Confirmed = 0, /**< Have 6 or more confirmations (normal tx) or fully mature (mined tx) **/
         /// Normal (sent/received) transactions
         OpenUntilDate,  /**< Transaction not yet final, waiting for date */
         OpenUntilBlock, /**< Transaction not yet final, waiting for block */
@@ -62,6 +62,8 @@ public:
 
     /** Current number of blocks (to know whether cached status is still valid) */
     int cur_num_blocks;
+
+    bool needsUpdate;
 };
 
 /** UI model for a transaction. A core transaction can be represented by multiple UI transactions if it has
@@ -70,8 +72,8 @@ public:
 class TransactionRecord
 {
 public:
-    enum Type {
-        Other,
+    enum Type : uint16_t {
+        Other = 0,
         Generated,
         StakeMint,
         StakeZSSMN,
@@ -79,6 +81,7 @@ public:
         SendToOther,
         RecvWithAddress,
         MNReward,
+        BudgetPayment,
         RecvFromOther,
         SendToSelf,
         ZerocoinMint,
@@ -95,6 +98,7 @@ public:
         P2CSUnlockStaker, // Staker watching the owner spent the delegated utxo
         SendToShielded, // Shielded send
         RecvWithShieldedAddress, // Shielded receive
+        RecvWithShieldedAddressMemo, // Shielded receive with memo
         SendToSelfShieldedAddress, // Shielded send to self
         SendToSelfShieldToTransparent, // Unshield coins to self
         SendToSelfShieldToShieldChangeAddress, // Changing coins from one shielded address to another inside the wallet.
@@ -174,21 +178,18 @@ public:
     TransactionStatus status;
 
     /** Whether the transaction was sent/received with a watch-only address */
-    bool involvesWatchAddress;
-
-    /** Return the unique identifier for this transaction (part) */
-    QString getTxID() const;
+    bool involvesWatchAddress{false};
 
     /** Return the output index of the subtransaction  */
     int getOutputIndex() const;
 
     /** Update status from core wallet tx.
      */
-    void updateStatus(const CWalletTx& wtx);
+    void updateStatus(const CWalletTx& wtx, int chainHeight);
 
     /** Return whether a status update is needed.
      */
-    bool statusUpdateNeeded();
+    bool statusUpdateNeeded(int blockHeight) const;
 
     /** Return transaction status
      */
@@ -197,6 +198,9 @@ public:
     /** Return true if the tx is a coinstake
      */
     bool isCoinStake() const;
+
+    /** Return true if the tx is a MN reward */
+    bool isMNReward() const;
 
     /** Return true if the tx is a any cold staking type tx.
      */

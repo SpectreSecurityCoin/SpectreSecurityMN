@@ -1,9 +1,9 @@
-// Copyright (c) 2020 The SPECTRESECURITY developers
+// Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include "destination_io.h"
-#include "base58.h"
+#include "key_io.h"
 #include "sapling/key_io_sapling.h"
 
 namespace Standard {
@@ -19,20 +19,21 @@ namespace Standard {
     CWDestination DecodeDestination(const std::string& strAddress)
     {
         bool isStaking = false;
-        return DecodeDestination(strAddress, isStaking);
+        bool isExchange = false;
+        return DecodeDestination(strAddress, isStaking, isExchange);
     }
 
-    CWDestination DecodeDestination(const std::string& strAddress, bool& isStaking)
+    CWDestination DecodeDestination(const std::string& strAddress, bool& isStaking, bool& isExchange)
     {
         bool isShielded = false;
-        return DecodeDestination(strAddress, isStaking, isShielded);
+        return DecodeDestination(strAddress, isStaking, isExchange, isShielded);
     }
 
     // agregar isShielded
-    CWDestination DecodeDestination(const std::string& strAddress, bool& isStaking, bool& isShielded)
+    CWDestination DecodeDestination(const std::string& strAddress, bool& isStaking, bool& isExchange, bool& isShielded)
     {
         CWDestination dest;
-        CTxDestination regDest = ::DecodeDestination(strAddress, isStaking);
+        CTxDestination regDest = ::DecodeDestination(strAddress, isStaking, isExchange);
         if (!IsValidDestination(regDest)) {
             const auto sapDest = KeyIO::DecodeSaplingPaymentAddress(strAddress);
             if (sapDest) {
@@ -65,4 +66,31 @@ namespace Standard {
     }
 
 } // End Standard namespace
+
+Destination& Destination::operator=(const Destination& from)
+{
+    this->dest = from.dest;
+    this->isP2CS = from.isP2CS;
+    this->isExchange = from.isExchange;
+    return *this;
+}
+
+// Returns the key ID if Destination is a transparent "regular" destination
+const CKeyID* Destination::getKeyID()
+{
+    const CTxDestination* regDest = Standard::GetTransparentDestination(dest);
+    return (regDest) ? boost::get<CKeyID>(regDest) : nullptr;
+}
+
+std::string Destination::ToString() const
+{
+    if (!Standard::IsValidDestination(dest)) {
+        // Invalid address
+        return "";
+    }
+    CChainParams::Base58Type addrType = isP2CS ? CChainParams::STAKING_ADDRESS
+                                 : (isExchange ? CChainParams::EXCHANGE_ADDRESS
+                                 : CChainParams::PUBKEY_ADDRESS);
+    return Standard::EncodeDestination(dest, addrType);
+}
 

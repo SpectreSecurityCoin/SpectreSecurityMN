@@ -1,15 +1,14 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "qt/spectresecurity/addresseswidget.h"
 #include "qt/spectresecurity/forms/ui_addresseswidget.h"
+#include "qt/spectresecurity/addressfilterproxymodel.h"
 #include "qt/spectresecurity/addresslabelrow.h"
-#include "qt/spectresecurity/addnewaddressdialog.h"
 #include "qt/spectresecurity/tooltipmenu.h"
 
 #include "qt/spectresecurity/addnewcontactdialog.h"
-#include "qt/spectresecurity/spectresecuritygui.h"
 #include "guiutil.h"
 #include "qt/spectresecurity/qtutils.h"
 #include "walletmodel.h"
@@ -23,11 +22,10 @@
 class ContactsHolder : public FurListRow<QWidget*>
 {
 public:
-    ContactsHolder();
-
     explicit ContactsHolder(bool _isLightTheme) : FurListRow(), isLightTheme(_isLightTheme){}
 
-    AddressLabelRow* createHolder(int pos) override{
+    AddressLabelRow* createHolder(int pos) override
+    {
         if (!cachedRow) cachedRow = new AddressLabelRow();
         cachedRow->init(isLightTheme, false);
         return cachedRow;
@@ -35,7 +33,7 @@ public:
 
     void init(QWidget* holder,const QModelIndex &index, bool isHovered, bool isSelected) const override
     {
-        AddressLabelRow* row = static_cast<AddressLabelRow*>(holder);
+        AddressLabelRow* row = dynamic_cast<AddressLabelRow*>(holder);
 
         row->updateState(isLightTheme, isHovered, isSelected);
 
@@ -133,15 +131,15 @@ AddressesWidget::AddressesWidget(SPECTRESECURITYGUI* parent) :
     connect(ui->btnAddContact, &OptionButton::clicked, this, &AddressesWidget::onAddContactShowHideClicked);
 }
 
-void AddressesWidget::handleAddressClicked(const QModelIndex &index)
+void AddressesWidget::handleAddressClicked(const QModelIndex& _index)
 {
-    ui->listAddresses->setCurrentIndex(index);
-    QRect rect = ui->listAddresses->visualRect(index);
+    ui->listAddresses->setCurrentIndex(_index);
+    QRect rect = ui->listAddresses->visualRect(_index);
     QPoint pos = rect.topRight();
     pos.setX(pos.x() - (DECORATION_SIZE * 2));
     pos.setY(pos.y() + (DECORATION_SIZE));
 
-    QModelIndex rIndex = filter->mapToSource(index);
+    QModelIndex rIndex = filter->mapToSource(_index);
 
     if (!this->menu) {
         this->menu = new TooltipMenu(window, this);
@@ -152,7 +150,7 @@ void AddressesWidget::handleAddressClicked(const QModelIndex &index)
     } else {
         this->menu->hide();
     }
-    this->index = rIndex;
+    index = rIndex;
     menu->move(pos);
     menu->show();
 }
@@ -175,7 +173,7 @@ void AddressesWidget::loadWalletModel()
 
 void AddressesWidget::updateListView()
 {
-    bool empty = addressTablemodel->sizeSend() == 0;
+    bool empty = addressTablemodel->sizeSendAll() == 0;
     ui->emptyContainer->setVisible(empty);
     ui->listAddresses->setVisible(!empty);
 }
@@ -186,8 +184,8 @@ void AddressesWidget::onStoreContactClicked()
         QString label = ui->lineEditName->text();
         QString address = ui->lineEditAddress->text();
 
-        bool isStakingAddress = false;
-        auto ssmnAdd = Standard::DecodeDestination(address.toUtf8().constData(), isStakingAddress);
+        bool isStaking = false, isExchange = false, isShield = false;
+        auto ssmnAdd = Standard::DecodeDestination(address.toUtf8().constData(), isStaking, isExchange, isShield);
 
         if (!Standard::IsValidDestination(ssmnAdd)) {
             setCssEditLine(ui->lineEditAddress, false, true);
@@ -211,7 +209,7 @@ void AddressesWidget::onStoreContactClicked()
         bool isShielded = walletModel->IsShieldedDestination(ssmnAdd);
         if (walletModel->updateAddressBookLabels(ssmnAdd, label.toUtf8().constData(),
                          isShielded ? AddressBook::AddressBookPurpose::SHIELDED_SEND :
-                         isStakingAddress ? AddressBook::AddressBookPurpose::COLD_STAKING_SEND : AddressBook::AddressBookPurpose::SEND)
+                         isStaking ? AddressBook::AddressBookPurpose::COLD_STAKING_SEND : AddressBook::AddressBookPurpose::SEND)
                 ) {
             ui->lineEditAddress->setText("");
             ui->lineEditName->setText("");
@@ -250,8 +248,9 @@ void AddressesWidget::onEditClicked()
 void AddressesWidget::onDeleteClicked()
 {
     if (walletModel) {
-        if (ask(tr("Delete Contact"), tr("You are just about to remove the contact:\n\n%1\n\nAre you sure?").arg(index.data(Qt::DisplayRole).toString().toUtf8().constData()))
-        ) {
+        if (ask(tr("Delete Contact"),
+                tr("You are just about to remove the contact:\n\n%1\n\nAre you sure?")
+                .arg(index.data(Qt::DisplayRole).toString().toUtf8().constData()))) {
             if (this->walletModel->getAddressTableModel()->removeRows(index.row(), 1, index)) {
                 updateListView();
                 inform(tr("Contact Deleted"));
@@ -299,7 +298,7 @@ void AddressesWidget::sortAddresses()
 
 void AddressesWidget::changeTheme(bool isLightTheme, QString& theme)
 {
-    static_cast<ContactsHolder*>(this->delegate->getRowFactory())->isLightTheme = isLightTheme;
+    dynamic_cast<ContactsHolder*>(this->delegate->getRowFactory())->isLightTheme = isLightTheme;
 }
 
 AddressesWidget::~AddressesWidget()

@@ -51,11 +51,15 @@ Node1 is unused in tests 3-7:
    work on its chain).
 """
 
-from test_framework.mininode import *
-from test_framework.test_framework import SpectresecurityTestFramework
-from test_framework.util import *
+import os
 import time
+
 from test_framework.blocktools import create_block, create_coinbase, create_transaction
+from test_framework.messages import CBlockHeader, CInv, msg_block, msg_headers, msg_inv
+from test_framework.mininode import mininode_lock, P2PInterface
+from test_framework.test_framework import SpectresecurityTestFramework
+from test_framework.util import assert_equal, assert_raises_rpc_error, connect_nodes
+
 
 class AcceptBlockTest(SpectresecurityTestFramework):
     def add_options(self, parser):
@@ -77,15 +81,11 @@ class AcceptBlockTest(SpectresecurityTestFramework):
         self.setup_nodes()
 
     def run_test(self):
-        # Setup the p2p connections and start up the network thread.
+        # Setup the p2p connections
         # test_node connects to node0 (not whitelisted)
         test_node = self.nodes[0].add_p2p_connection(P2PInterface())
         # min_work_node connects to node1 (whitelisted)
         min_work_node = self.nodes[1].add_p2p_connection(P2PInterface())
-
-        network_thread_start()
-
-        # Test logic begins here
         test_node.wait_for_verack()
         min_work_node.wait_for_verack()
 
@@ -122,7 +122,7 @@ class AcceptBlockTest(SpectresecurityTestFramework):
             if x['hash'] == block_h1f.hash:
                 assert_equal(x['status'], "headers-only")
                 tip_entry_found = True
-        assert(tip_entry_found)
+        assert tip_entry_found
         assert_raises_rpc_error(-1, "Block not found on disk", self.nodes[0].getblock, block_h1f.hash)
 
         # 4. Send another two block that build on the fork.
@@ -139,7 +139,7 @@ class AcceptBlockTest(SpectresecurityTestFramework):
             if x['hash'] == block_h2f.hash:
                 assert_equal(x['status'], "headers-only")
                 tip_entry_found = True
-        assert(tip_entry_found)
+        assert tip_entry_found
 
         # But this block should be accepted by node since it has equal work.
         self.nodes[0].getblock(block_h2f.hash)
@@ -158,7 +158,7 @@ class AcceptBlockTest(SpectresecurityTestFramework):
             if x['hash'] == block_h3.hash:
                 assert_equal(x['status'], "headers-only")
                 tip_entry_found = True
-        assert(tip_entry_found)
+        assert tip_entry_found
         self.nodes[0].getblock(block_h3.hash)
 
         # But this block should be accepted by node since it has more work.
@@ -208,10 +208,8 @@ class AcceptBlockTest(SpectresecurityTestFramework):
 
         self.nodes[0].disconnect_p2ps()
         self.nodes[1].disconnect_p2ps()
-        network_thread_join()
 
         test_node = self.nodes[0].add_p2p_connection(P2PInterface())
-        network_thread_start()
         test_node.wait_for_verack()
 
         test_node.send_message(msg_block(block_h1f))
@@ -274,7 +272,7 @@ class AcceptBlockTest(SpectresecurityTestFramework):
             if x['hash'] == block_292.hash:
                 assert_equal(x['status'], "headers-only")
                 tip_entry_found = True
-        assert(tip_entry_found)
+        assert tip_entry_found
         assert_raises_rpc_error(-1, "Block not found on disk", self.nodes[0].getblock, block_292.hash)
 
         test_node.send_message(msg_block(block_289f))
@@ -297,8 +295,6 @@ class AcceptBlockTest(SpectresecurityTestFramework):
 
             self.nodes[0].disconnect_p2ps()
             test_node = self.nodes[0].add_p2p_connection(P2PInterface())
-
-            network_thread_start()
             test_node.wait_for_verack()
 
         # We should have failed reorg and switched back to 290 (but have block 291)
@@ -316,7 +312,7 @@ class AcceptBlockTest(SpectresecurityTestFramework):
 
         # 9. Connect node1 to node0 and ensure it is able to sync
         connect_nodes(self.nodes[0], 1)
-        sync_blocks([self.nodes[0], self.nodes[1]])
+        self.sync_blocks([self.nodes[0], self.nodes[1]])
         self.log.info("Successfully synced nodes 1 and 0")
 
 if __name__ == '__main__':

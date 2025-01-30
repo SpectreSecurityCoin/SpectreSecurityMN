@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
-// Copyright (c) 2018-2019 The SPECTRESECURITY developers
+// Copyright (c) 2018-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,10 +28,10 @@ public:
         if (nSize > m_remaining)
             throw std::ios_base::failure(std::string(__func__) + ": end of data");
 
-        if (pch == NULL)
+        if (pch == nullptr)
             throw std::ios_base::failure(std::string(__func__) + ": bad destination buffer");
 
-        if (m_data == NULL)
+        if (m_data == nullptr)
             throw std::ios_base::failure(std::string(__func__) + ": bad source buffer");
 
         memcpy(pch, m_data, nSize);
@@ -40,7 +40,7 @@ public:
     }
 
     template<typename T>
-    TxInputStream& operator>>(T& obj)
+    TxInputStream& operator>>(T&& obj)
     {
         ::Unserialize(*this, obj);
         return *this;
@@ -78,18 +78,17 @@ int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey, unsigned i
 {
     try {
         TxInputStream stream(SER_NETWORK, PROTOCOL_VERSION, txTo, txToLen);
-        CTransaction tx;
-        stream >> tx;
+        CTransaction tx(deserialize, stream);
         if (nIn >= tx.vin.size())
             return set_error(err, bitcoinconsensus_ERR_TX_INDEX);
-        if (GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) != txToLen)
+        if (GetSerializeSize(tx, PROTOCOL_VERSION) != txToLen)
             return set_error(err, bitcoinconsensus_ERR_TX_SIZE_MISMATCH);
 
          // Regardless of the verification result, the tx did not error.
          set_error(err, bitcoinconsensus_ERR_OK);
 
         return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen),
-                flags, TransactionSignatureChecker(&tx, nIn), tx.GetRequiredSigVersion(), NULL);
+                flags, TransactionSignatureChecker(&tx, nIn), tx.GetRequiredSigVersion(), nullptr);
     } catch (const std::exception&) {
         return set_error(err, bitcoinconsensus_ERR_TX_DESERIALIZE); // Error deserializing
     }

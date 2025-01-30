@@ -30,7 +30,7 @@ Drag SPECTRESECURITY-Qt to your applications folder, and then run SPECTRESECURIT
 
 * See the documentation at the [SPECTRESECURITY Wiki](https://github.com/Spectresecurity/spectresecurity/wiki)
 for help and more information.
-* Ask for help on [BitcoinTalk](https://bitcointalk.org/index.php?topic=1262920.0) or on the [SPECTRESECURITY Forum](http://forum.spectresecurity.org/).
+* Ask for help on the [SPECTRESECURITY Forum](http://forum.spectresecurity.org/).
 * Join our Discord server [Discord Server](https://discord.spectresecurity.io)
 
 Building
@@ -58,12 +58,13 @@ The SPECTRESECURITY repo's [root README](/README.md) contains relevant informati
 - [Dnsseed Policy](dnsseed-policy.md)
 
 ### Resources
-* Discuss on the [BitcoinTalk](https://bitcointalk.org/index.php?topic=1262920.0) or the [SPECTRESECURITY](http://forum.spectresecurity.org/) forum.
+* Discuss on the [SPECTRESECURITY](http://forum.spectresecurity.org/) forum.
 * Join the [SPECTRESECURITY Discord](https://discord.spectresecurity.io).
 
 ### Miscellaneous
-- [Assets Attribution](assets-attribution.md)
 - [Files](files.md)
+- [Fuzz-testing](fuzzing.md)
+- [Reduce Memory](reduce-memory.md)
 - [Tor Support](tor.md)
 - [Init Scripts (systemd/upstart/openrc)](init.md)
 

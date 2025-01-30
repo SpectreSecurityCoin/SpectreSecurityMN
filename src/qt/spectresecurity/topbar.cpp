@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
@@ -13,16 +13,13 @@
 #include "bitcoinunits.h"
 #include "qt/spectresecurity/balancebubble.h"
 #include "clientmodel.h"
-#include "qt/guiconstants.h"
 #include "qt/guiutil.h"
 #include "optionsmodel.h"
-#include "qt/platformstyle.h"
 #include "walletmodel.h"
 #include "addresstablemodel.h"
-#include "guiinterface.h"
 
-#include "masternode-sync.h"
-#include "wallet/wallet.h"
+#include "masternode-sync.h" // for MASTERNODE_SYNC_THRESHOLD
+#include "tiertwo/tiertwo_sync_state.h"
 
 #include <QPixmap>
 
@@ -423,6 +420,7 @@ void TopBar::loadClientModel()
 
         setNumBlocks(clientModel->getNumBlocks());
         connect(clientModel, &ClientModel::numBlocksChanged, this, &TopBar::setNumBlocks);
+        connect(clientModel, &ClientModel::networkActiveChanged, this, &TopBar::setNetworkActive);
 
         timerStakingIcon = new QTimer(ui->pushButtonStack);
         connect(timerStakingIcon, &QTimer::timeout, this, &TopBar::updateStakingStatus);
@@ -443,12 +441,13 @@ void TopBar::setStakingStatusActive(bool fActive)
 }
 void TopBar::updateStakingStatus()
 {
-    setStakingStatusActive(walletModel &&
-                           !walletModel->isWalletLocked() &&
-                           walletModel->isStakingStatusActive());
+    if (walletModel && !walletModel->isShutdownRequested()) {
+        setStakingStatusActive(!walletModel->isWalletLocked() &&
+                               walletModel->isStakingStatusActive());
 
-    // Taking advantage of this timer to update Tor status if needed.
-    updateTorIcon();
+        // Taking advantage of this timer to update Tor status if needed.
+        updateTorIcon();
+    }
 }
 
 void TopBar::setNumConnections(int count)
@@ -468,48 +467,43 @@ void TopBar::setNumConnections(int count)
     ui->pushButtonConnection->setButtonText(tr("%n active connection(s)", "", count));
 }
 
+void TopBar::setNetworkActive(bool active)
+{
+    if (!active) {
+        ui->pushButtonSync->setButtonText(tr("Network activity disabled"));
+        ui->pushButtonSync->setButtonClassStyle("cssClass", "btn-check-sync-inactive", true);
+    } else {
+        if (!clientModel) return;
+        setNumBlocks(clientModel->getLastBlockProcessedHeight());
+        ui->pushButtonSync->setButtonClassStyle("cssClass", "btn-check-sync", true);
+    }
+}
+
 void TopBar::setNumBlocks(int count)
 {
     if (!clientModel)
         return;
 
-    // Acquire current block source
-    enum BlockSource blockSource = clientModel->getBlockSource();
-    std::string text = "";
-    switch (blockSource) {
-        case BLOCK_SOURCE_NETWORK:
-            text = "Synchronizing..";
-            break;
-        case BLOCK_SOURCE_DISK:
-            text = "Importing blocks from disk..";
-            break;
-        case BLOCK_SOURCE_REINDEX:
-            text = "Reindexing blocks on disk..";
-            break;
-        case BLOCK_SOURCE_NONE:
-            // Case: not Importing, not Reindexing and no network connection
-            text = "No block source available..";
-            ui->pushButtonSync->setChecked(false);
-            break;
-    }
-
+    std::string text;
     bool needState = true;
-    if (masternodeSync.IsBlockchainSynced()) {
+    if (g_tiertwo_sync_state.IsBlockchainSynced()) {
         // chain synced
         Q_EMIT walletSynced(true);
-        if (masternodeSync.IsSynced()) {
+        if (g_tiertwo_sync_state.IsSynced()) {
             // Node synced
             ui->pushButtonSync->setButtonText(tr("Synchronized - Block: %1").arg(QString::number(count)));
-            progressBar->setRange(0,100);
+            progressBar->setRange(0, 100);
             progressBar->setValue(100);
+            Q_EMIT tierTwoSynced(true);
             return;
         } else {
 
             // TODO: Show out of sync warning
+            int RequestedMasternodeAssets = g_tiertwo_sync_state.GetSyncPhase();
             int nAttempt = masternodeSync.RequestedMasternodeAttempt < MASTERNODE_SYNC_THRESHOLD ?
-                       masternodeSync.RequestedMasternodeAttempt + 1 :
-                       MASTERNODE_SYNC_THRESHOLD;
-            int progress = nAttempt + (masternodeSync.RequestedMasternodeAssets - 1) * MASTERNODE_SYNC_THRESHOLD;
+                           masternodeSync.RequestedMasternodeAttempt + 1 :
+                           MASTERNODE_SYNC_THRESHOLD;
+            int progress = nAttempt + (RequestedMasternodeAssets - 1) * MASTERNODE_SYNC_THRESHOLD;
             if (progress >= 0) {
                 // todo: MN progress..
                 text = strprintf("%s - Block: %d", masternodeSync.GetSyncStatus(), count);
@@ -522,7 +516,7 @@ void TopBar::setNumBlocks(int count)
         Q_EMIT walletSynced(false);
     }
 
-    if (needState) {
+    if (needState && clientModel->isTipCached()) {
         // Represent time from last generated block in human readable text
         QDateTime lastBlockDate = clientModel->getLastBlockDate();
         QDateTime currentDate = QDateTime::currentDateTime();
@@ -564,7 +558,7 @@ void TopBar::showUpgradeDialog(const QString& message)
 {
     QString title = tr("Wallet Upgrade");
     if (ask(title, message)) {
-        std::unique_ptr<WalletModel::UnlockContext> pctx = MakeUnique<WalletModel::UnlockContext>(walletModel->requestUnlock());
+        std::unique_ptr<WalletModel::UnlockContext> pctx = std::make_unique<WalletModel::UnlockContext>(walletModel->requestUnlock());
         if (!pctx->isValid()) {
             warn(tr("Upgrade Wallet"), tr("Wallet unlock cancelled"));
             return;
@@ -628,8 +622,8 @@ void TopBar::updateTorIcon()
             ui->pushButtonTor->setChecked(true);
             ui->pushButtonTor->setButtonClassStyle("cssClass", "btn-check-tor", true);
         }
-        QString ip_port_q = QString::fromStdString(ip_port);
-        ui->pushButtonTor->setButtonText(tr("Tor Active: %1").arg(ip_port_q));
+        ui->pushButtonTor->setButtonText(tr("Tor Active"));
+        ui->pushButtonTor->setToolTip("Address: " + QString::fromStdString(ip_port));
     } else {
         if (ui->pushButtonTor->isChecked()) {
             ui->pushButtonTor->setChecked(false);
@@ -683,7 +677,7 @@ void TopBar::updateBalances(const interfaces::WalletBalances& newBalance)
     // Locked balance. //TODO move this to the signal properly in the future..
     CAmount nLockedBalance = 0;
     if (walletModel) {
-        nLockedBalance = walletModel->getLockedBalance();
+        nLockedBalance = walletModel->getLockedBalance(true) + walletModel->getLockedBalance(false);
     }
     ui->labelTitle1->setText(nLockedBalance > 0 ? tr("Available (Locked included)") : tr("Available"));
 
@@ -722,7 +716,7 @@ void TopBar::expandSync()
     }
 }
 
-void TopBar::updateHDState(const bool& upgraded, const QString& upgradeError)
+void TopBar::updateHDState(const bool upgraded, const QString& upgradeError)
 {
     if (upgraded) {
         ui->pushButtonHDUpgrade->setVisible(false);
@@ -731,7 +725,7 @@ void TopBar::updateHDState(const bool& upgraded, const QString& upgradeError)
             // backup wallet
             QString filename = GUIUtil::getSaveFileName(this,
                                                 tr("Backup Wallet"), QString(),
-                                                tr("Wallet Data (*.dat)"), NULL);
+                                                tr("Wallet Data (*.dat)"), nullptr);
             if (!filename.isEmpty()) {
                 inform(walletModel->backupWallet(filename) ? tr("Backup created") : tr("Backup creation failed"));
             } else {

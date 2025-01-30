@@ -9,7 +9,7 @@ from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
     assert_greater_than,
-    connect_nodes,
+    assert_greater_than_or_equal,
     count_bytes,
     find_vout_for_address,
     Decimal,
@@ -76,6 +76,11 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         self.nodes[0].generate(121)
         self.sync_all()
 
+        # ensure that setting changePosition in fundraw with an exact match is handled properly
+        rawmatch = self.nodes[1].createrawtransaction([], {self.nodes[2].getnewaddress(): DecimalAmt(250.0)})
+        rawmatch = self.nodes[1].fundrawtransaction(rawmatch, {"changePosition": 1, "subtractFeeFromOutputs": [0]})
+        assert_equal(rawmatch["changepos"], -1)
+
         watchonly_address = self.nodes[0].getnewaddress()
         watchonly_pubkey = self.nodes[0].validateaddress(watchonly_address)["pubkey"]
         self.watchonly_amount = DecimalAmt(200.0)
@@ -84,7 +89,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
 
         # Lock UTXO so nodes[0] doesn't accidentally spend it
         self.watchonly_vout = find_vout_for_address(self.nodes[0], self.watchonly_txid, watchonly_address)
-        self.nodes[0].lockunspent(False, [{"txid": self.watchonly_txid, "vout": self.watchonly_vout}])
+        self.nodes[0].lockunspent(False, True, [{"txid": self.watchonly_txid, "vout": self.watchonly_vout}])
 
         self.nodes[0].sendtoaddress(self.nodes[3].getnewaddress(), float(self.watchonly_amount) / 10)
 
@@ -121,25 +126,26 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         self.test_watchonly()
         self.test_all_watched_funds()
         self.test_option_feerate()
+        self.test_option_subtract_fee_from_outputs()
 
     def test_simple(self):
         self.log.info("simple test")
         dec_tx, fee, changepos = self.create_and_fund(2, [], {self.nodes[0].getnewaddress(): 1.0})
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_greater_than(changepos, -1)                      # check change
         assert_equal(Decimal(dec_tx['vout'][changepos]['value']) + fee, DecimalAmt(0.5))
 
     def test_simple_two_coins(self):
         self.log.info("simple test with two coins")
         dec_tx, fee, changepos = self.create_and_fund(2, [], {self.nodes[0].getnewaddress(): 2.2})
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_greater_than(changepos, -1)                      # check change
         assert_equal(Decimal(dec_tx['vout'][changepos]['value']) + fee, DecimalAmt(0.3))
 
     def test_simple_one_coin(self):
         self.log.info("simple test with one coin")
         dec_tx, fee, changepos = self.create_and_fund(2, [], {self.nodes[0].getnewaddress(): 2.6})
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_greater_than(changepos, -1)                      # check change
         assert_equal(Decimal(dec_tx['vout'][changepos]['value']) + fee, DecimalAmt(2.4))
 
@@ -147,7 +153,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         self.log.info("simple test with two outputs")
         outputs = {self.nodes[0].getnewaddress(): 2.6, self.nodes[1].getnewaddress(): 2.5}
         dec_tx, fee, changepos = self.create_and_fund(2, [], outputs)
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_greater_than(changepos, -1)                      # check change
         assert_equal(Decimal(dec_tx['vout'][changepos]['value']) + fee, DecimalAmt(0.9))
         assert check_outputs(outputs, dec_tx)                   # check outputs
@@ -158,7 +164,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
         outputs = {self.nodes[0].getnewaddress(): 1.0}
         dec_tx, fee, changepos = self.create_and_fund(2, inputs, outputs)
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_greater_than(changepos, -1)                      # check change
         assert_equal(Decimal(dec_tx['vout'][changepos]['value']) + fee, DecimalAmt(4.0))
         assert check_outputs(outputs, dec_tx)                   # check outputs
@@ -170,7 +176,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         inputs = [{'txid': utx['txid'], 'vout': utx['vout']}]
         outputs = {self.nodes[0].getnewaddress(): 5.0 - float(self.test_no_change_fee) - float(self.fee_tolerance)}
         dec_tx, fee, changepos = self.create_and_fund(2, inputs, outputs)
-        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)              # test if we have enough inputs
         assert_equal(changepos, -1)                             # check (no) change
         assert check_outputs(outputs, dec_tx)                   # check outputs
 
@@ -229,7 +235,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         fee = rawtxfund['fee']
         changepos = rawtxfund['changepos']
         dec_tx = self.nodes[2].decoderawtransaction(rawtxfund['hex'])
-        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enough inputs
         assert_equal("00", dec_tx['vin'][0]['scriptSig']['hex'])    # check vin sig again
         assert_equal(len(dec_tx['vout']), 2)
         assert_greater_than(changepos, -1)                          # check change
@@ -243,7 +249,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         inputs = [{'txid': utx['txid'], 'vout': utx['vout']}, {'txid': utx2['txid'], 'vout': utx2['vout']}]
         outputs = {self.nodes[0].getnewaddress(): 6.0}
         dec_tx, fee, changepos = self.create_and_fund(2, inputs, outputs)
-        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enough inputs
         assert check_outputs(outputs, dec_tx)                       # check outputs
         assert_equal(len(dec_tx['vout']), 2)
         matchingIns = len([x for x in dec_tx['vin'] if x['txid'] in [y['txid'] for y in inputs]])
@@ -258,7 +264,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         inputs = [{'txid': utx['txid'], 'vout': utx['vout']}, {'txid': utx2['txid'], 'vout': utx2['vout']}]
         outputs = {self.nodes[0].getnewaddress(): 6.0, self.nodes[0].getnewaddress(): 1.0}
         dec_tx, fee, changepos = self.create_and_fund(2, inputs, outputs)
-        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enought inputs
+        assert_equal(len(dec_tx['vin']) > 0, True)                  # test if we have enough inputs
         assert check_outputs(outputs, dec_tx)                       # check outputs
         assert_equal(len(dec_tx['vout']), 3)
         matchingIns = len([x for x in dec_tx['vin'] if x['txid'] in [y['txid'] for y in inputs]])
@@ -364,11 +370,7 @@ class RawTransactionsTest(SpectresecurityTestFramework):
     def test_locked_wallet(self):
         self.log.info("test locked wallet")
 
-        self.nodes[1].node_encrypt_wallet("test")
-        self.start_node(1)
-        connect_nodes(self.nodes[0], 1)
-        connect_nodes(self.nodes[1], 2)
-        self.sync_all()
+        self.nodes[1].encryptwallet("test")
 
         # Drain the keypool.
         self.nodes[1].getnewaddress()
@@ -515,6 +517,74 @@ class RawTransactionsTest(SpectresecurityTestFramework):
         assert_fee_amount(result2['fee'], count_bytes(result2['hex']), 2 * result_fee_rate)
         assert_fee_amount(result3['fee'], count_bytes(result3['hex']), 10 * result_fee_rate)
 
+    def test_option_subtract_fee_from_outputs(self):
+        self.log.info("Test fundrawtxn subtractFeeFromOutputs option")
+
+        # Make sure there is exactly one input so coin selection can't skew the result.
+        assert_equal(len(self.nodes[3].listunspent(1)), 1)
+
+        inputs = []
+        outputs = {self.nodes[2].getnewaddress(): 1}
+        rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
+
+        # Test subtract fee from outputs with feeRate
+        result = [self.nodes[3].fundrawtransaction(rawtx),  # uses self.min_relay_tx_fee (set by settxfee)
+            self.nodes[3].fundrawtransaction(rawtx, {"subtractFeeFromOutputs": []}),  # empty subtraction list
+            self.nodes[3].fundrawtransaction(rawtx, {"subtractFeeFromOutputs": [0]}),  # uses self.min_relay_tx_fee (set by settxfee)
+            self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2 * self.min_relay_tx_fee}),
+            self.nodes[3].fundrawtransaction(rawtx, {"feeRate": 2 * self.min_relay_tx_fee, "subtractFeeFromOutputs": [0]}),]
+        dec_tx = [self.nodes[3].decoderawtransaction(tx_['hex']) for tx_ in result]
+        output = [d['vout'][1 - r['changepos']]['value'] for d, r in zip(dec_tx, result)]
+        change = [d['vout'][r['changepos']]['value'] for d, r in zip(dec_tx, result)]
+
+        assert_equal(result[0]['fee'], result[1]['fee'], result[2]['fee'])
+        assert_equal(result[3]['fee'], result[4]['fee'])
+        assert_equal(change[0], change[1])
+        assert_equal(output[0], output[1])
+        assert_equal(output[0], output[2] + result[2]['fee'])
+        assert_equal(change[0] + result[0]['fee'], change[2])
+        assert_equal(output[3], output[4] + result[4]['fee'])
+        assert_equal(change[3] + result[3]['fee'], change[4])
+
+        inputs = []
+        outputs = {self.nodes[2].getnewaddress(): value for value in (1.0, 1.1, 1.2, 1.3)}
+        rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
+
+        result = [self.nodes[3].fundrawtransaction(rawtx),
+                  # split the fee between outputs 0, 2, and 3, but not output 1
+                  self.nodes[3].fundrawtransaction(rawtx, {"subtractFeeFromOutputs": [0, 2, 3]})]
+
+        dec_tx = [self.nodes[3].decoderawtransaction(result[0]['hex']),
+                  self.nodes[3].decoderawtransaction(result[1]['hex'])]
+
+        # Nested list of non-change output amounts for each transaction.
+        output = [[out['value'] for i, out in enumerate(d['vout']) if i != r['changepos']]
+                  for d, r in zip(dec_tx, result)]
+
+        # List of differences in output amounts between normal and subtractFee transactions.
+        share = [o0 - o1 for o0, o1 in zip(output[0], output[1])]
+
+        # Output 1 is the same in both transactions.
+        assert_equal(share[1], 0)
+
+        # The other 3 outputs are smaller as a result of subtractFeeFromOutputs.
+        assert_greater_than(share[0], 0)
+        assert_greater_than(share[2], 0)
+        assert_greater_than(share[3], 0)
+
+        # Outputs 2 and 3 take the same share of the fee.
+        assert_equal(share[2], share[3])
+
+        # Output 0 takes at least as much share of the fee, and no more than 2
+        # satoshis more, than outputs 2 and 3.
+        assert_greater_than_or_equal(share[0], share[2])
+        assert_greater_than_or_equal(share[2] + Decimal(2e-8), share[0])
+
+        # The fee is the same in both transactions.
+        assert_equal(result[0]['fee'], result[1]['fee'])
+
+        # The total subtracted from the outputs is equal to the fee.
+        assert_equal(share[0] + share[2] + share[3], result[0]['fee'])
 
 
 if __name__ == '__main__':

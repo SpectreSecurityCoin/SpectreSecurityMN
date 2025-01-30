@@ -1,16 +1,16 @@
-// Copyright (c) 2019 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef MASTERNODEWIZARDDIALOG_H
 #define MASTERNODEWIZARDDIALOG_H
 
-#include "walletmodel.h"
 #include "qt/spectresecurity/focuseddialog.h"
 #include "qt/spectresecurity/snackbar.h"
 #include "masternodeconfig.h"
 #include "qt/spectresecurity/pwidget.h"
 
+class MNModel;
 class WalletModel;
 
 namespace Ui {
@@ -23,8 +23,10 @@ class MasterNodeWizardDialog : public FocusedDialog, public PWidget::Translator
     Q_OBJECT
 
 public:
-    explicit MasterNodeWizardDialog(WalletModel *walletMode, QWidget *parent = nullptr);
-    ~MasterNodeWizardDialog();
+    explicit MasterNodeWizardDialog(WalletModel* walletMode,
+                                    MNModel* mnModel,
+                                    QWidget *parent = nullptr);
+    ~MasterNodeWizardDialog() override;
     void showEvent(QShowEvent *event) override;
     QString translate(const char *msg) override { return tr(msg); }
 
@@ -43,10 +45,10 @@ private:
     SnackBar *snackBar = nullptr;
     int pos = 0;
 
-    WalletModel *walletModel = nullptr;
+    WalletModel* walletModel{nullptr};
+    MNModel* mnModel{nullptr};
     bool createMN();
-    void inform(QString text);
-    void initBtn(std::initializer_list<QPushButton*> args);
+    void inform(const QString& text);
 };
 
 #endif // MASTERNODEWIZARDDIALOG_H

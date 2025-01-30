@@ -1,4 +1,4 @@
-// Copyright (c) 2020 The SPECTRESECURITY developers
+// Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,24 +11,26 @@
 class CLegacyZSsmnStake : public CStakeInput
 {
 private:
-    uint32_t nChecksum;
-    libzerocoin::CoinDenomination denom;
-    uint256 hashSerial;
+    uint32_t nChecksum{0};
+    libzerocoin::CoinDenomination denom{libzerocoin::ZQ_ERROR};
+    uint256 hashSerial{UINT256_ZERO};
 
 public:
-    CLegacyZSsmnStake() : CStakeInput(nullptr) {}
+    CLegacyZSsmnStake(const CBlockIndex* _pindexFrom, uint32_t _nChecksum, libzerocoin::CoinDenomination _denom, const uint256& _hashSerial) :
+        CStakeInput(_pindexFrom),
+        nChecksum(_nChecksum),
+        denom(_denom),
+        hashSerial(_hashSerial)
+    {}
 
-    explicit CLegacyZSsmnStake(const libzerocoin::CoinSpend& spend);
-    bool InitFromTxIn(const CTxIn& txin) override;
+    static CLegacyZSsmnStake* NewZSsmnStake(const CTxIn& txin, int nHeight);
+
     bool IsZSSMN() const override { return true; }
     uint32_t GetChecksum() const { return nChecksum; }
     const CBlockIndex* GetIndexFrom() const override;
     CAmount GetValue() const override;
     CDataStream GetUniqueness() const override;
-    bool CreateTxIn(CWallet* pwallet, CTxIn& txIn, uint256 hashTxOut = UINT256_ZERO) override { return false; /* creation disabled */}
-    bool CreateTxOuts(CWallet* pwallet, std::vector<CTxOut>& vout, CAmount nTotal, const bool onlyP2PK) override { return false; /* creation disabled */}
     bool GetTxOutFrom(CTxOut& out) const override { return false; /* not available */ }
-    virtual bool ContextCheck(int nHeight, uint32_t nTime) override;
 };
 
 #endif //SPECTRESECURITY_LEGACY_ZPOS_H

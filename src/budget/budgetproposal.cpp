@@ -1,11 +1,12 @@
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2020 The SPECTRESECURITY developers
+// Copyright (c) 2015-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "budget/budgetproposal.h"
-
-#include "masternodeman.h"
+#include "chainparams.h"
+#include "script/standard.h"
+#include "utilstrencodings.h"
 
 CBudgetProposal::CBudgetProposal():
         nAllotted(0),
@@ -39,12 +40,8 @@ CBudgetProposal::CBudgetProposal(const std::string& name,
         nFeeTXHash(nfeetxhash),
         nTime(0)
 {
-    const int nBlocksPerCycle = Params().GetConsensus().nBudgetCycleBlocks;
-    // !todo: remove this when v5 rules are enforced (nBlockStart is always = to nCycleStart)
-    int nCycleStart = nBlockStart - nBlockStart % nBlocksPerCycle;
-
     // calculate the expiration block
-    nBlockEnd = nCycleStart + (nBlocksPerCycle + 1)  * paycount;
+    nBlockEnd = nBlockStart + (Params().GetConsensus().nBudgetCycleBlocks + 1)  * paycount;
 }
 
 // initialize from network broadcast message
@@ -58,7 +55,7 @@ bool CBudgetProposal::ParseBroadcast(CDataStream& broadcast)
         broadcast >> nBlockStart;
         broadcast >> nBlockEnd;
         broadcast >> nAmount;
-        broadcast >> *(CScriptBase*)(&address);
+        broadcast >> address;
         broadcast >> nFeeTXHash;
     } catch (std::exception& e) {
         return error("Unable to deserialize proposal broadcast: %s", e.what());
@@ -77,9 +74,9 @@ void CBudgetProposal::SyncVotes(CNode* pfrom, bool fPartial, int& nInvCount) con
     }
 }
 
-bool CBudgetProposal::IsHeavilyDownvoted(bool fNewRules)
+bool CBudgetProposal::IsHeavilyDownvoted(int mnCount)
 {
-    if (GetNays() - GetYeas() > (fNewRules ? 3 : 1) * mnodeman.CountEnabled(ActiveProtocol()) / 10) {
+    if (GetNays() - GetYeas() > 3 * mnCount / 10) {
         strInvalid = "Heavily Downvoted";
         return true;
     }
@@ -88,12 +85,9 @@ bool CBudgetProposal::IsHeavilyDownvoted(bool fNewRules)
 
 bool CBudgetProposal::CheckStartEnd()
 {
-    // !TODO: remove (and always use new rules) when all proposals submitted before v5 enforcement are expired.
-    bool fNewRules = Params().GetConsensus().NetworkUpgradeActive(nBlockStart, Consensus::UPGRADE_V5_0);
-
+    // block start must be a superblock
     if (nBlockStart < 0 ||
-            // block start must be a superblock
-            (fNewRules && (nBlockStart % Params().GetConsensus().nBudgetCycleBlocks) != 0)) {
+            nBlockStart % Params().GetConsensus().nBudgetCycleBlocks != 0) {
         strInvalid = "Invalid nBlockStart";
         return false;
     }
@@ -103,7 +97,7 @@ bool CBudgetProposal::CheckStartEnd()
         return false;
     }
 
-    if (fNewRules && GetTotalPaymentCount() > Params().GetConsensus().nMaxProposalPayments) {
+    if (GetTotalPaymentCount() > Params().GetConsensus().nMaxProposalPayments) {
         strInvalid = "Invalid payment count";
         return false;
     }
@@ -114,7 +108,7 @@ bool CBudgetProposal::CheckStartEnd()
 bool CBudgetProposal::CheckAmount(const CAmount& nTotalBudget)
 {
     // check minimum amount
-    if (nAmount < 10 * COIN) {
+    if (nAmount < PROPOSAL_MIN_AMOUNT) {
         strInvalid = "Invalid nAmount (too low)";
         return false;
     }
@@ -152,33 +146,44 @@ bool CBudgetProposal::CheckAddress()
     return true;
 }
 
+/* TODO: Add this to IsWellFormed() for the next hard-fork
+ * This will networkly reject malformed proposal names and URLs
+ */
+bool CBudgetProposal::CheckStrings()
+{
+    if (strProposalName != SanitizeString(strProposalName)) {
+        strInvalid = "Proposal name contains illegal characters.";
+        return false;
+    }
+    if (strURL != SanitizeString(strURL)) {
+        strInvalid = "Proposal URL contains illegal characters.";
+    }
+}
+
 bool CBudgetProposal::IsWellFormed(const CAmount& nTotalBudget)
 {
     return CheckStartEnd() && CheckAmount(nTotalBudget) && CheckAddress();
 }
 
-bool CBudgetProposal::IsExpired(int nCurrentHeight)
+bool CBudgetProposal::updateExpired(int nCurrentHeight)
 {
-    if (nBlockEnd < nCurrentHeight) {
+    if (IsExpired(nCurrentHeight)) {
         strInvalid = "Proposal expired";
         return true;
     }
     return false;
 }
 
-bool CBudgetProposal::UpdateValid(int nCurrentHeight)
+bool CBudgetProposal::UpdateValid(int nCurrentHeight, int mnCount)
 {
     fValid = false;
 
-    // !TODO: remove after v5 enforcement and use fixed multiplier (3)
-    bool fNewRules = Params().GetConsensus().NetworkUpgradeActive(nCurrentHeight, Consensus::UPGRADE_V5_0);
-
     // Never kill a proposal before the first superblock
-    if (!fNewRules || nCurrentHeight > nBlockStart) {
-        if (IsHeavilyDownvoted(fNewRules)) return false;
+    if (nCurrentHeight > nBlockStart && IsHeavilyDownvoted(mnCount)) {
+        return false;
     }
 
-    if (IsExpired(nCurrentHeight)) {
+    if (updateExpired(nCurrentHeight)) {
         return false;
     }
 
@@ -212,14 +217,19 @@ bool CBudgetProposal::IsPassing(int nBlockStartBudget, int nBlockEndBudget, int 
     return true;
 }
 
+bool CBudgetProposal::IsExpired(int nCurrentHeight) const
+{
+    return nBlockEnd < nCurrentHeight;
+}
+
 bool CBudgetProposal::AddOrUpdateVote(const CBudgetVote& vote, std::string& strError)
 {
     std::string strAction = "New vote inserted:";
-    const uint256& hash = vote.GetVin().prevout.GetHash();
+    const COutPoint& mnId = vote.GetVin().prevout;
     const int64_t voteTime = vote.GetTime();
 
-    if (mapVotes.count(hash)) {
-        const int64_t& oldTime = mapVotes[hash].GetTime();
+    if (mapVotes.count(mnId)) {
+        const int64_t& oldTime = mapVotes[mnId].GetTime();
         if (oldTime > voteTime) {
             strError = strprintf("new vote older than existing vote - %s\n", vote.GetHash().ToString());
             LogPrint(BCLog::MNBUDGET, "%s: %s\n", __func__, strError);
@@ -234,13 +244,7 @@ bool CBudgetProposal::AddOrUpdateVote(const CBudgetVote& vote, std::string& strE
         strAction = "Existing vote updated:";
     }
 
-    if (voteTime > GetTime() + (60 * 60)) {
-        strError = strprintf("new vote is too far ahead of current time - %s - nTime %lli - Max Time %lli\n", vote.GetHash().ToString(), voteTime, GetTime() + (60 * 60));
-        LogPrint(BCLog::MNBUDGET, "%s: %s\n", __func__, strError);
-        return false;
-    }
-
-    mapVotes[hash] = vote;
+    mapVotes[mnId] = vote;
     LogPrint(BCLog::MNBUDGET, "%s: %s %s\n", __func__, strAction.c_str(), vote.GetHash().ToString().c_str());
 
     return true;
@@ -267,20 +271,6 @@ void CBudgetProposal::SetSynced(bool synced)
     }
 }
 
-// If masternode voted for a proposal, but is now invalid -- remove the vote
-void CBudgetProposal::CleanAndRemove()
-{
-    LogPrint(BCLog::MNBUDGET, "Cleaning budget votes for %s. Before: YES=%d, NO=%d\n", GetName(), GetYeas(), GetNays());
-    std::map<uint256, CBudgetVote>::iterator it = mapVotes.begin();
-
-    while (it != mapVotes.end()) {
-        CMasternode* pmn = mnodeman.Find(it->second.GetVin().prevout);
-        (*it).second.SetValid(pmn != nullptr);
-        ++it;
-    }
-    LogPrint(BCLog::MNBUDGET, "Cleaned budget votes for %s. After: YES=%d, NO=%d\n", GetName(), GetYeas(), GetNays());
-}
-
 double CBudgetProposal::GetRatio() const
 {
     int yeas = GetYeas();
@@ -300,15 +290,6 @@ int CBudgetProposal::GetVoteCount(CBudgetVote::VoteDirection vd) const
             ret++;
     }
     return ret;
-}
-
-std::vector<uint256> CBudgetProposal::GetVotesHashes() const
-{
-    std::vector<uint256> vRet;
-    for (const auto& it: mapVotes) {
-        vRet.push_back(it.first);
-    }
-    return vRet;
 }
 
 int CBudgetProposal::GetBlockStartCycle() const
@@ -335,7 +316,7 @@ int CBudgetProposal::GetTotalPaymentCount() const
 
 int CBudgetProposal::GetRemainingPaymentCount(int nCurrentHeight) const
 {
-    // If this budget starts in the future, this value will be wrong
+    // If the proposal is already finished (passed the end block cycle), the payments value will be negative
     int nPayments = (GetBlockEndCycle() - GetBlockCycle(nCurrentHeight)) / Params().GetConsensus().nBudgetCycleBlocks - 1;
     // Take the lowest value
     return std::min(nPayments, GetTotalPaymentCount());
@@ -352,7 +333,7 @@ CDataStream CBudgetProposal::GetBroadcast() const
     broadcast << nBlockStart;
     broadcast << nBlockEnd;
     broadcast << nAmount;
-    broadcast << *(CScriptBase*)(&address);
+    broadcast << address;
     broadcast << nFeeTXHash;
     return broadcast;
 }

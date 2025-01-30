@@ -1,6 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2012-2014 The Bitcoin developers
-// Copyright (c) 2017-2020 The SPECTRESECURITY developers
+// Copyright (c) 2017-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,6 +18,7 @@ class CBasicKeyStore;
 class CWallet;
 class uint256;
 class CBlockIndex;
+class CDeterministicMNList;
 
 /** General change type (added, updated, removed). */
 enum ChangeType {
@@ -88,6 +89,9 @@ public:
     /** Number of network connections changed. */
     boost::signals2::signal<void(int newNumConnections)> NotifyNumConnectionsChanged;
 
+    /** Network activity state changed. */
+    boost::signals2::signal<void (bool networkActive)> NotifyNetworkActiveChanged;
+
     /** New, updated or cancelled alert. */
     boost::signals2::signal<void()> NotifyAlertChanged;
 
@@ -100,11 +104,11 @@ public:
     /** New block has been accepted */
     boost::signals2::signal<void(bool fInitialDownload, const CBlockIndex* newTip)> NotifyBlockTip;
 
-    /** New block has been accepted and is over a certain size */
-    boost::signals2::signal<void(int size, const uint256& hash)> NotifyBlockSize;
-
     /** Banlist did change. */
     boost::signals2::signal<void (void)> BannedListChanged;
+
+    /** Deterministic Masternode list has changed */
+    boost::signals2::signal<void (const CDeterministicMNList&)> NotifyMasternodeListChanged;
 };
 
 extern CClientUIInterface uiInterface;

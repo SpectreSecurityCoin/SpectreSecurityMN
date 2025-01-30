@@ -1,6 +1,6 @@
 // Copyright (c) 2011-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2020 The SPECTRESECURITY developers
+// Copyright (c) 2015-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,17 +14,18 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "clientversion.h"
-#include "masternode-sync.h"
+#include "interfaces/handler.h"
+#include "mapport.h"
 #include "masternodeman.h"
 #include "net.h"
 #include "netbase.h"
 #include "guiinterface.h"
-#include "util.h"
+#include "util/system.h"
+#include "validation.h"
 #include "warnings.h"
 
 #include <stdint.h>
 
-#include <QDateTime>
 #include <QDebug>
 #include <QTimer>
 
@@ -49,6 +50,7 @@ ClientModel::ClientModel(OptionsModel* optionsModel, QObject* parent) : QObject(
 
     pollMnTimer = new QTimer(this);
     connect(pollMnTimer, &QTimer::timeout, this, &ClientModel::updateMnTimer);
+    startMasternodesTimer();
 
     subscribeToCoreSignals();
 }
@@ -74,16 +76,19 @@ int ClientModel::getNumConnections(unsigned int flags) const
     return 0;
 }
 
-QString ClientModel::getMasternodeCountString() const
+QString ClientModel::getMasternodeCountString()
 {
-    int ipv4 = 0, ipv6 = 0, onion = 0;
-    int total = mnodeman.CountNetworks(ipv4, ipv6, onion);
-    int nUnknown = total - ipv4 - ipv6 - onion;
-    if(nUnknown < 0) nUnknown = 0;
-    return tr("Total: %1 (IPv4: %2 / IPv6: %3 / Tor: %4 / Unknown: %5)").arg(QString::number(total)).arg(QString::number((int)ipv4)).arg(QString::number((int)ipv6)).arg(QString::number((int)onion)).arg(QString::number((int)nUnknown));
+    const auto& info = mnodeman.getMNsInfo();
+    int unknown = std::max(0, info.total - info.ipv4 - info.ipv6 - info.onion);
+    m_cached_masternodes_count = info.total;
+    return tr("Total: %1 (IPv4: %2 / IPv6: %3 / Tor: %4 / Unknown: %5)").arg(QString::number(info.total))
+                                                                        .arg(QString::number(info.ipv4))
+                                                                        .arg(QString::number(info.ipv6))
+                                                                        .arg(QString::number(info.onion))
+                                                                        .arg(QString::number(unknown));
 }
 
-QString ClientModel::getMasternodesCount()
+QString ClientModel::getMasternodesCountString()
 {
     if (!cachedMasternodeCountString.isEmpty()) {
         return cachedMasternodeCountString;
@@ -135,6 +140,26 @@ QString ClientModel::getLastBlockHash() const
     return QString::fromStdString(nHash.GetHex());
 }
 
+uint256 ClientModel::getLastBlockProcessed() const
+{
+    return cacheTip == nullptr ? Params().GenesisBlock().GetHash() : cacheTip->GetBlockHash();
+}
+
+int ClientModel::getLastBlockProcessedHeight() const
+{
+    return cacheTip == nullptr ? 0 : cacheTip->nHeight;
+}
+
+int64_t ClientModel::getLastBlockProcessedTime() const
+{
+    return cacheTip == nullptr ? Params().GenesisBlock().GetBlockTime() : cacheTip->GetBlockTime();
+}
+
+bool ClientModel::isTipCached() const
+{
+    return cacheTip;
+}
+
 double ClientModel::getVerificationProgress() const
 {
     return Checkpoints::GuessVerificationProgress(cacheTip);
@@ -181,6 +206,11 @@ void ClientModel::updateNumConnections(int numConnections)
     Q_EMIT numConnectionsChanged(numConnections);
 }
 
+void ClientModel::updateNetworkActive(bool networkActive)
+{
+    Q_EMIT networkActiveChanged(networkActive);
+}
+
 void ClientModel::updateAlert()
 {
     Q_EMIT alertsChanged(getStatusBarWarnings());
@@ -201,6 +231,21 @@ enum BlockSource ClientModel::getBlockSource() const
         return BLOCK_SOURCE_NETWORK;
 
     return BLOCK_SOURCE_NONE;
+}
+
+void ClientModel::setNetworkActive(bool active)
+{
+    if (g_connman) {
+        g_connman->SetNetworkActive(active);
+    }
+}
+
+bool ClientModel::getNetworkActive() const
+{
+    if (g_connman) {
+        return g_connman->GetNetworkActive();
+    }
+    return false;
 }
 
 QString ClientModel::getStatusBarWarnings() const
@@ -226,11 +271,6 @@ BanTableModel *ClientModel::getBanTableModel()
 QString ClientModel::formatFullVersion() const
 {
     return QString::fromStdString(FormatFullVersion());
-}
-
-QString ClientModel::formatBuildDate() const
-{
-    return QString::fromStdString(CLIENT_DATE);
 }
 
 bool ClientModel::isReleaseVersion() const
@@ -295,6 +335,12 @@ static void NotifyNumConnectionsChanged(ClientModel* clientmodel, int newNumConn
         Q_ARG(int, newNumConnections));
 }
 
+static void NotifyNetworkActiveChanged(ClientModel *clientmodel, bool networkActive)
+{
+    QMetaObject::invokeMethod(clientmodel, "updateNetworkActive", Qt::QueuedConnection,
+                              Q_ARG(bool, networkActive));
+}
+
 static void NotifyAlertChanged(ClientModel* clientmodel)
 {
     qDebug() << "NotifyAlertChanged";
@@ -310,21 +356,27 @@ static void BannedListChanged(ClientModel *clientmodel)
 void ClientModel::subscribeToCoreSignals()
 {
     // Connect signals to client
-    uiInterface.ShowProgress.connect(boost::bind(ShowProgress, this, _1, _2));
-    uiInterface.NotifyNumConnectionsChanged.connect(boost::bind(NotifyNumConnectionsChanged, this, _1));
-    uiInterface.NotifyAlertChanged.connect(boost::bind(NotifyAlertChanged, this));
-    uiInterface.BannedListChanged.connect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.connect(boost::bind(BlockTipChanged, this, _1, _2));
+    m_handler_show_progress = interfaces::MakeHandler(uiInterface.ShowProgress.connect(std::bind(ShowProgress, this, std::placeholders::_1, std::placeholders::_2)));
+    m_handler_notify_num_connections_changed = interfaces::MakeHandler(uiInterface.NotifyNumConnectionsChanged.connect(std::bind(NotifyNumConnectionsChanged, this, std::placeholders::_1)));
+    m_handler_notify_net_activity_changed = interfaces::MakeHandler(uiInterface.NotifyNetworkActiveChanged.connect(std::bind(NotifyNetworkActiveChanged, this, std::placeholders::_1)));
+    m_handler_notify_alert_changed = interfaces::MakeHandler(uiInterface.NotifyAlertChanged.connect(std::bind(NotifyAlertChanged, this)));
+    m_handler_banned_list_changed = interfaces::MakeHandler(uiInterface.BannedListChanged.connect(std::bind(BannedListChanged, this)));
+    m_handler_notify_block_tip = interfaces::MakeHandler(uiInterface.NotifyBlockTip.connect(std::bind(BlockTipChanged, this, std::placeholders::_1, std::placeholders::_2)));
 }
 
 void ClientModel::unsubscribeFromCoreSignals()
 {
     // Disconnect signals from client
-    uiInterface.ShowProgress.disconnect(boost::bind(ShowProgress, this, _1, _2));
-    uiInterface.NotifyNumConnectionsChanged.disconnect(boost::bind(NotifyNumConnectionsChanged, this, _1));
-    uiInterface.NotifyAlertChanged.disconnect(boost::bind(NotifyAlertChanged, this));
-    uiInterface.BannedListChanged.disconnect(boost::bind(BannedListChanged, this));
-    uiInterface.NotifyBlockTip.disconnect(boost::bind(BlockTipChanged, this, _1, _2));
+    m_handler_show_progress->disconnect();
+    m_handler_notify_num_connections_changed->disconnect();
+    m_handler_notify_net_activity_changed->disconnect();
+    m_handler_notify_alert_changed->disconnect();
+    m_handler_banned_list_changed->disconnect();
+    m_handler_notify_block_tip->disconnect();
+}
+
+void ClientModel::mapPort(bool use_upnp, bool use_natpmp) {
+    StartMapPort(use_upnp, use_natpmp);
 }
 
 bool ClientModel::getTorInfo(std::string& ip_port) const
@@ -335,7 +387,7 @@ bool ClientModel::getTorInfo(std::string& ip_port) const
             LOCK(cs_mapLocalHost);
             for (const std::pair<const CNetAddr, LocalServiceInfo>& item : mapLocalHost) {
                 if (item.first.IsTor()) {
-                    CService addrOnion(LookupNumeric(item.first.ToString().c_str(), item.second.nPort));
+                    CService addrOnion(LookupNumeric(item.first.ToString(), item.second.nPort));
                     ip_port = addrOnion.ToStringIPPort();
                     return true;
                 }

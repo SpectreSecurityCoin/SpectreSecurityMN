@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string></string>
+   <string notr="true">N/A</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
@@ -937,7 +937,7 @@
                      </property>
                      <property name="text">
                       <string>Welcome to
-SPECTRESECURITY Core Wallet</string>
+%1 Wallet</string>
                      </property>
                      <property name="alignment">
                       <set>Qt::AlignCenter</set>

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2019 The SPECTRESECURITY developers
+// Copyright (c) 2015-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,18 +8,12 @@
 #include "config/spectresecurity-config.h"
 #endif
 
-#include "util.h"
+#include "util/system.h"
 #include "uritests.h"
-
-#ifdef ENABLE_WALLET
-#include "paymentservertests.h"
-#endif
 
 #include <QCoreApplication>
 #include <QObject>
 #include <QTest>
-
-#include <openssl/ssl.h>
 
 #if defined(QT_STATICPLUGIN)
 #include <QtPlugin>
@@ -48,16 +42,9 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
     app.setApplicationName("Spectresecurity-Qt-test");
 
-    SSL_library_init();
-
     URITests test1;
     if (QTest::qExec(&test1) != 0)
         fInvalid = true;
-#ifdef ENABLE_WALLET
-    PaymentServerTests test2;
-    if (QTest::qExec(&test2) != 0)
-        fInvalid = true;
-#endif
 
     return fInvalid;
 }

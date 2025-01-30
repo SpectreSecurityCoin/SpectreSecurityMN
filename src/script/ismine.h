@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
-// Copyright (c) 2017-2019 The SPECTRESECURITY developers
+// Copyright (c) 2017-2020 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -43,7 +43,7 @@ isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
 isminetype IsMine(const CKeyStore& keystore, const libzcash::SaplingPaymentAddress& pa);
 isminetype IsMine(const CKeyStore& keystore, const CWDestination& dest);
 /**
- * Cachable amount subdivided into watchonly and spendable parts.
+ * Cacheable amount subdivided into watchonly and spendable parts.
  */
 struct CachableAmount
 {

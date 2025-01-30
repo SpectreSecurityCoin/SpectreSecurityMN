@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2018-2020 The SPECTRESECURITY developers
+// Copyright (c) 2018-2020 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -56,16 +56,16 @@ public:
 
         cachedBanlist.clear();
         cachedBanlist.reserve(banMap.size());
-        for (banmap_t::iterator it = banMap.begin(); it != banMap.end(); it++)
+        for (const auto& entry : banMap)
         {
             CCombinedBan banEntry;
-            banEntry.subnet = (*it).first;
-            banEntry.banEntry = (*it).second;
+            banEntry.subnet = entry.first;
+            banEntry.banEntry = entry.second;
             cachedBanlist.append(banEntry);
         }
 
         if (sortColumn >= 0)
-            // sort cachedBanlist (use stable sort to prevent rows jumping around unneceesarily)
+            // sort cachedBanlist (use stable sort to prevent rows jumping around unnecessarily)
             std::stable_sort(cachedBanlist.begin(), cachedBanlist.end(), BannedNodeLessThan(sortColumn, sortOrder));
     }
 

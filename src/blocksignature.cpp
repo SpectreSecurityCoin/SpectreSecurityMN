@@ -1,11 +1,32 @@
-// Copyright (c) 2017-2020 The SPECTRESECURITY developers
+// Copyright (c) 2017-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blocksignature.h"
 
 #include "script/standard.h"
-#include "zssmnchain.h"
+#include "zssmn/zssmnmodule.h"
+
+static bool GetKeyIDFromUTXO(const CTxOut& utxo, CKeyID& keyIDRet)
+{
+    std::vector<valtype> vSolutions;
+    txnouttype whichType;
+    if (utxo.scriptPubKey.empty() || !Solver(utxo.scriptPubKey, whichType, vSolutions))
+        return false;
+    if (whichType == TX_PUBKEY) {
+        keyIDRet = CPubKey(vSolutions[0]).GetID();
+        return true;
+    }
+    if (whichType == TX_PUBKEYHASH || whichType == TX_COLDSTAKE) {
+        keyIDRet = CKeyID(uint160(vSolutions[0]));
+        return true;
+    }
+    if (whichType == TX_EXCHANGEADDR) {
+        keyIDRet = CExchangeKeyID(uint160(vSolutions[0]));
+        return true;
+    }
+    return false;
+}
 
 bool SignBlockWithKey(CBlock& block, const CKey& key)
 {
@@ -18,19 +39,8 @@ bool SignBlockWithKey(CBlock& block, const CKey& key)
 bool SignBlock(CBlock& block, const CKeyStore& keystore)
 {
     CKeyID keyID;
-    if (block.IsProofOfWork()) {
-        bool fFoundID = false;
-        for (const CTxOut& txout : block.vtx[0]->vout) {
-            if (!txout.GetKeyIDFromUTXO(keyID))
-                continue;
-            fFoundID = true;
-            break;
-        }
-        if (!fFoundID)
-            return error("%s: failed to find key for PoW", __func__);
-    } else {
-        if (!block.vtx[1]->vout[1].GetKeyIDFromUTXO(keyID))
-            return error("%s: failed to find key for PoS", __func__);
+    if (!GetKeyIDFromUTXO(block.vtx[1]->vout[1], keyID)) {
+        return error("%s: failed to find key for PoS", __func__);
     }
 
     CKey key;
@@ -40,7 +50,7 @@ bool SignBlock(CBlock& block, const CKeyStore& keystore)
     return SignBlockWithKey(block, key);
 }
 
-bool CheckBlockSignature(const CBlock& block, const bool enableP2PKH)
+bool CheckBlockSignature(const CBlock& block)
 {
     if (block.IsProofOfWork())
         return block.vchBlockSig.empty();
@@ -55,7 +65,7 @@ bool CheckBlockSignature(const CBlock& block, const bool enableP2PKH)
     CPubKey pubkey;
     bool fzSSMNStake = block.vtx[1]->vin[0].IsZerocoinSpend();
     if (fzSSMNStake) {
-        libzerocoin::CoinSpend spend = TxInToZerocoinSpend(block.vtx[1]->vin[0]);
+        libzerocoin::CoinSpend spend = ZSSMNModule::TxInToZerocoinSpend(block.vtx[1]->vin[0]);
         pubkey = spend.getPubKey();
     } else {
         txnouttype whichType;
@@ -63,13 +73,6 @@ bool CheckBlockSignature(const CBlock& block, const bool enableP2PKH)
         const CTxOut& txout = block.vtx[1]->vout[1];
         if (!Solver(txout.scriptPubKey, whichType, vSolutions))
             return false;
-
-        if (!enableP2PKH) {
-            // Before v5 activation, P2PKH was always failing.
-            if (whichType == TX_PUBKEYHASH) {
-                return false;
-            }
-        }
 
         if (whichType == TX_PUBKEY) {
             valtype& vchPubKey = vSolutions[0];
@@ -83,14 +86,17 @@ bool CheckBlockSignature(const CBlock& block, const bool enableP2PKH)
                 // p2pk scriptsig only contains the signature and p2pkh scriptpubkey only contain the hash.
                 return false;
             } else {
-                int start = 1 + (int) *txin.scriptSig.begin(); // skip sig
+                unsigned int start = 1 + (unsigned int) *txin.scriptSig.begin(); // skip sig
+                if (start >= txin.scriptSig.size() - 1) return false;
                 pubkey = CPubKey(txin.scriptSig.begin()+start+1, txin.scriptSig.end());
             }
         } else if (whichType == TX_COLDSTAKE) {
             // pick the public key from the P2CS input
             const CTxIn& txin = block.vtx[1]->vin[0];
-            int start = 1 + (int) *txin.scriptSig.begin(); // skip sig
+            unsigned int start = 1 + (unsigned int) *txin.scriptSig.begin(); // skip sig
+            if (start >= txin.scriptSig.size() - 1) return false;
             start += 1 + (int) *(txin.scriptSig.begin()+start); // skip flag
+            if (start >= txin.scriptSig.size() - 1) return false;
             pubkey = CPubKey(txin.scriptSig.begin()+start+1, txin.scriptSig.end());
         }
     }

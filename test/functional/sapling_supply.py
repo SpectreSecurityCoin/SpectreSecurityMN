@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020 The SPECTRESECURITY developers
+# Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+from decimal import Decimal
 
 from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
     assert_equal,
 )
-from decimal import Decimal
 
 class SaplingSupplyTest(SpectresecurityTestFramework):
 
@@ -17,7 +18,7 @@ class SaplingSupplyTest(SpectresecurityTestFramework):
         self.extra_args = [['-nuparams=v5_shield:1']]
 
     def generate_and_sync(self, count):
-        assert(count > 0)
+        assert count > 0
         height = self.nodes[0].getblockcount()
         self.nodes[0].generate(count)
         assert_equal(height + count, self.nodes[0].getblockcount())

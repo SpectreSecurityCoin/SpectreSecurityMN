@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# Copyright (c) 2019 The SPECTRESECURITY developers
+# Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test RPC commands for budget proposal creation, submission, and verification."""
 
 from test_framework.test_framework import SpectresecurityTestFramework
-from test_framework.util import *
-
+from test_framework.util import assert_equal, assert_raises_rpc_error
+import time
 
 class BudgetProposalTest(SpectresecurityTestFramework):
     def set_test_params(self):
@@ -63,16 +63,16 @@ class BudgetProposalTest(SpectresecurityTestFramework):
 
         self.log.info("Test without URL scheme")
         scheme = ''
-        assert_raises_rpc_error(-8, "Invalid URL, check scheme (e.g. https://)", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
+        assert_raises_rpc_error(-8, "Invalid URL", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
 
         self.log.info('Test with invalid URL scheme: ftp://')
         scheme = 'ftp://'
-        assert_raises_rpc_error(-8, "Invalid URL, check scheme (e.g. https://)", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
+        assert_raises_rpc_error(-8, "Invalid URL", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
 
         self.log.info("Test with invalid double character scheme: hhttps://")
         scheme = 'hhttps://'
         url = 'test.com'
-        assert_raises_rpc_error(-8, "Invalid URL, check scheme (e.g. https://)", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
+        assert_raises_rpc_error(-8, "Invalid URL", self.nodes[0].preparebudget, name, scheme + url, 1, nextsuperblock, address, 100)
 
         self.log.info("Test with valid scheme: http://")
         name = 'testvalid1'
@@ -83,6 +83,7 @@ class BudgetProposalTest(SpectresecurityTestFramework):
 
         self.log.info("Generate 7 blocks to confirm fee transaction")
         self.nodes[0].generate(7)
+        time.sleep(20) # so the tier two sync can update its status
 
         self.log.info("Submit the budget proposal")
         submitret = self.nodes[0].submitbudget(name, scheme + url, numcycles, nextsuperblock, address, cycleamount, feehashret)

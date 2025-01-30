@@ -9,6 +9,7 @@ RPCs tested are:
     - listaddressgroupings
     - setlabel
 """
+
 from collections import defaultdict
 
 from test_framework.test_framework import SpectresecurityTestFramework
@@ -30,26 +31,22 @@ class WalletlabelsTest(SpectresecurityTestFramework):
         assert_equal(node.getbalance(), 500)
 
         # there should be 2 address groups
-        # each with 1 address with a balance of 50 Bitcoins
+        # each with 1 address with a balance of 250 SSMNs
         address_groups = node.listaddressgroupings()
-        assert_equal(len(address_groups), 1)
+        assert_equal(len(address_groups), 2)
         # the addresses aren't linked now, but will be after we send to the
         # common address
         linked_addresses = set()
-        #for address_group in address_groups:
-        #    assert_equal(len(address_group), 1)
-        #    assert_equal(len(address_group[0]), 2)
-        #    assert_equal(address_group[0][1], 250)
-        #    linked_addresses.add(address_group[0][0])
+        for address_group in address_groups:
+            assert_equal(len(address_group), 1)
+            assert_equal(len(address_group[0]), 2)
+            assert_equal(address_group[0][1], 250)
+            linked_addresses.add(address_group[0][0])
 
         # send 50 from each address to a third address not in this wallet
-        # There's some fee that will come back to us when the miner reward
-        # matures.
         node.settxfee(0)
         common_address = "y9B3dwrBGGs3yVkyEHm68Yn36Wp2Rt7Vtd"
-        txid = node.sendmany("", {common_address: 100}, 1)
-        tx_details = node.gettransaction(txid)
-        fee = -tx_details['details'][0]['fee']
+        node.sendmany("", {common_address: 100}, 1)
         # there should be 1 address group, with the previously
         # unlinked addresses now linked (they both have 0 balance)
         #address_groups = node.listaddressgroupings()
@@ -122,6 +119,16 @@ class WalletlabelsTest(SpectresecurityTestFramework):
             label.purpose[staking_address] = "coldstaking"
             label.verify(node)
             assert_raises_rpc_error(-11, "No addresses with label", node.getaddressesbylabel, "")
+
+        if not self.options.legacywallet:
+            # Check that setlabel can assign a label to a new unused shield address.
+            for label in labels:
+                shield_address = node.getnewshieldaddress()
+                node.setlabel(shield_address, label.name)
+                label.add_address(shield_address)
+                label.purpose[shield_address] = "shielded_receive"
+                label.verify(node)
+                assert_raises_rpc_error(-11, "No addresses with label", node.getaddressesbylabel, "")
 
         # Check that addmultisigaddress can assign labels.
         for label in labels:

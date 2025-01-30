@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -34,6 +34,8 @@ SendMultiRow::SendMultiRow(SPECTRESECURITYGUI* _window, PWidget *parent) :
     // future: when we get a designer, this should have another icon. A "memo" icon instead of a "+"
     setCssProperty(ui->btnAddMemo, "btn-secundary-add");
 
+    setCssProperty(ui->checkboxSubtractFeeFromAmount, "combo-light");
+
     // Button menu
     setCssProperty(ui->btnMenu, "btn-menu");
     ui->btnMenu->setVisible(false);
@@ -63,11 +65,10 @@ SendMultiRow::SendMultiRow(SPECTRESECURITYGUI* _window, PWidget *parent) :
     connect(ui->btnAddMemo, &QPushButton::clicked, this, &SendMultiRow::onMemoClicked);
 }
 
-void SendMultiRow::amountChanged(const QString& amount)
+void SendMultiRow::amountChanged(const QString& amountStr)
 {
-    if (!amount.isEmpty()) {
-        QString amountStr = amount;
-        CAmount value = getAmountValue(amountStr);
+    if (!amountStr.isEmpty()) {
+        auto value = GUIUtil::parseValue(amountStr, displayUnit);
         if (value > 0) {
             GUIUtil::updateWidgetTextAndCursorPosition(ui->lineEditAmount, amountStr);
             setCssEditLine(ui->lineEditAmount, true, true);
@@ -102,16 +103,6 @@ bool SendMultiRow::launchMemoDialog()
     }
     dialog->deleteLater();
     return ret;
-}
-
-/**
- * Returns -1 if the value is invalid
- */
-CAmount SendMultiRow::getAmountValue(QString amount)
-{
-    bool isValid = false;
-    CAmount value = GUIUtil::parseValue(amount, displayUnit, &isValid);
-    return isValid ? value : -1;
 }
 
 bool SendMultiRow::addressChanged(const QString& str, bool fOnlyValidate)
@@ -149,6 +140,10 @@ bool SendMultiRow::addressChanged(const QString& str, bool fOnlyValidate)
         updateStyle(ui->lineEditAddress);
         return valid;
     }
+
+    setCssProperty(ui->lineEditAddress, "edit-primary-multi-book");
+    updateStyle(ui->lineEditAddress);
+
     return false;
 }
 
@@ -189,10 +184,6 @@ bool SendMultiRow::validate()
     // Check input validity
     bool retval = true;
 
-    // Skip checks for payment request
-    if (recipient.paymentRequest.IsInitialized())
-        return retval;
-
     // Check address validity, returns false if it's invalid
     QString address = ui->lineEditAddress->text();
     if (address.isEmpty()){
@@ -201,7 +192,7 @@ bool SendMultiRow::validate()
     } else
         retval = addressChanged(address, true);
 
-    CAmount value = getAmountValue(ui->lineEditAmount->text());
+    CAmount value = getAmountValue();
 
     // Sending a zero amount is invalid
     if (value <= 0) {
@@ -220,16 +211,12 @@ bool SendMultiRow::validate()
 
 SendCoinsRecipient SendMultiRow::getValue()
 {
-    // Payment request
-    if (recipient.paymentRequest.IsInitialized())
-        return recipient;
-
-    // Normal payment
     recipient.address = getAddress();
     recipient.label = ui->lineEditDescription->text();
     recipient.amount = getAmountValue();
     auto dest = Standard::DecodeDestination(recipient.address.toStdString());
     recipient.isShieldedAddr = boost::get<libzcash::SaplingPaymentAddress>(&dest);
+    recipient.fSubtractFee = getSubtractFeeFromAmount();
     return recipient;
 }
 
@@ -240,7 +227,7 @@ QString SendMultiRow::getAddress()
 
 CAmount SendMultiRow::getAmountValue()
 {
-    return getAmountValue(ui->lineEditAmount->text());
+    return GUIUtil::parseValue(ui->lineEditAmount->text(), displayUnit);
 }
 
 QString SendMultiRow::getMemo()
@@ -268,6 +255,11 @@ int SendMultiRow::getNumber()
     return number;
 }
 
+bool SendMultiRow::getSubtractFeeFromAmount() const
+{
+    return ui->checkboxSubtractFeeFromAmount->isChecked();
+}
+
 void SendMultiRow::setAddress(const QString& address)
 {
     ui->lineEditAddress->setText(address);
@@ -277,6 +269,12 @@ void SendMultiRow::setAddress(const QString& address)
 void SendMultiRow::setAmount(const QString& amount)
 {
     ui->lineEditAmount->setText(amount);
+}
+
+void SendMultiRow::toggleSubtractFeeFromAmount()
+{
+    bool old = ui->checkboxSubtractFeeFromAmount->isChecked();
+    ui->checkboxSubtractFeeFromAmount->setChecked(!old);
 }
 
 void SendMultiRow::setAddressAndLabelOrDescription(const QString& address, const QString& message)

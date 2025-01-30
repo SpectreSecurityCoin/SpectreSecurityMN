@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # Copyright (c) 2018 The Zcash developers
-# Copyright (c) 2020 The SPECTRESECURITY developers
+# Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-from test_framework.test_framework import SpectresecurityTestFramework
-from test_framework.util import *
 from decimal import Decimal
+
+from test_framework.test_framework import SpectresecurityTestFramework
+from test_framework.util import assert_equal, connect_nodes, get_coinstake_address
 
 class WalletAnchorForkTest(SpectresecurityTestFramework):
 
@@ -19,11 +20,12 @@ class WalletAnchorForkTest(SpectresecurityTestFramework):
     def run_test (self):
         self.nodes[0].generate(4) # generate blocks to activate sapling in regtest
         # verify sapling activation.
-        assert(self.nodes[0].getblockchaininfo()['upgrades']['v5 shield']['activationheight'] == 1)
+        assert self.nodes[0].getblockchaininfo()['upgrades']['v5 shield']['activationheight'] == 1
 
         self.sync_all()
 
         walletinfo = self.nodes[0].getwalletinfo()
+        assert_equal(self.nodes[0].getblockcount(), walletinfo['last_processed_block'])
         assert_equal(walletinfo['immature_balance'], 1000)
         assert_equal(walletinfo['balance'], 0)
 
@@ -63,11 +65,11 @@ class WalletAnchorForkTest(SpectresecurityTestFramework):
 
         # Partition B, node 1 mines an empty block
         self.nodes[1].generate(1)
-        sync_blocks(self.nodes[1:3])
+        self.sync_blocks(self.nodes[1:3])
 
         # Check partition
         assert_equal(self.nodes[1].getblockcount(), self.nodes[2].getblockcount())
-        assert(self.nodes[2].getblockcount() != self.nodes[0].getblockcount())
+        assert self.nodes[2].getblockcount() != self.nodes[0].getblockcount()
 
         # Partition A, node 0 creates a shield transaction
         recipients = []
@@ -77,7 +79,7 @@ class WalletAnchorForkTest(SpectresecurityTestFramework):
 
         # Partition A, node 0 mines a block with the transaction
         self.nodes[0].generate(1)
-        self.sync_all([self.nodes[1:3]])
+        self.sync_all(self.nodes[1:3])
 
         # Partition B, node 1 mines the same shield transaction
         txid2 = self.nodes[1].sendrawtransaction(rawhex)
@@ -86,7 +88,7 @@ class WalletAnchorForkTest(SpectresecurityTestFramework):
 
         # Check that Partition B is one block ahead and that they have different tips
         assert_equal(self.nodes[0].getblockcount() + 1, self.nodes[1].getblockcount())
-        assert(self.nodes[0].getbestblockhash() != self.nodes[1].getbestblockhash())
+        assert self.nodes[0].getbestblockhash() != self.nodes[1].getbestblockhash()
 
         # Shut down all nodes so any in-memory state is saved to disk
         self.stop_nodes()

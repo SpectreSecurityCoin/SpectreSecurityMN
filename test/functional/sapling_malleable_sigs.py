@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 # Copyright (c) 2018 The Zcash developers
-# Copyright (c) 2020 The SPECTRESECURITY developers
+# Copyright (c) 2020-2021 The SPECTRESECURITY Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-from test_framework.test_framework import SpectresecurityTestFramework
+from decimal import Decimal
+from io import BytesIO
 
-from test_framework.messages import (
-    CTransaction,
-)
+from test_framework.messages import CTransaction
+from test_framework.test_framework import SpectresecurityTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
-    bytes_to_hex_str,
     hex_str_to_bytes,
 )
 
-from decimal import Decimal
-from io import BytesIO
 
 class MalleableSigsTest(SpectresecurityTestFramework):
 
@@ -44,7 +41,7 @@ class MalleableSigsTest(SpectresecurityTestFramework):
         new_tx = CTransaction()
         new_tx.deserialize(BytesIO(hex_str_to_bytes(rawtx_hex)))
         new_tx.sapData = b""
-        new_rawtx = bytes_to_hex_str(new_tx.serialize())
+        new_rawtx = new_tx.serialize().hex()
         self.log.info("Sending malleated tx...")
         assert_raises_rpc_error(-26, "mandatory-script-verify-flag-failed",
                                 node.sendrawtransaction, new_rawtx, True)

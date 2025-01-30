@@ -1,13 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin developers
 // Copyright (c) 2014-2015 The Dash developers
-// Copyright (c) 2015-2019 The SPECTRESECURITY developers
+// Copyright (c) 2015-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef SPECTRESECURITY_HASH_H
 #define SPECTRESECURITY_HASH_H
 
+#include "arith_uint256.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha256.h"
 #include "prevector.h"
@@ -24,7 +25,6 @@
 #include "crypto/sha512.h"
 
 #include <iomanip>
-#include <openssl/sha.h>
 #include <sstream>
 #include <vector>
 
@@ -150,30 +150,6 @@ public:
     }
 };
 
-/** Compute the 256-bit hash of a std::string */
-inline std::string Hash(std::string input)
-{
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input.c_str(), input.size());
-    SHA256_Final(hash, &sha256);
-    std::stringstream ss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
-    }
-    return ss.str();
-}
-
-/** Compute the 256-bit hash of a void pointer */
-inline void Hash(void* in, unsigned int len, unsigned char* out)
-{
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, in, len);
-    SHA256_Final(out, &sha256);
-}
-
 /** Compute the 512-bit hash of an object. */
 template <typename T1>
 inline uint512 Hash512(const T1 pbegin, const T1 pend)
@@ -209,46 +185,6 @@ inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2
     static const unsigned char pblank[1] = {};
     uint256 result;
     CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0])).Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0])).Finalize((unsigned char*)&result);
-    return result;
-}
-
-/** Compute the 256-bit hash of the concatenation of three objects. */
-template <typename T1, typename T2, typename T3>
-inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2 p2end, const T3 p3begin, const T3 p3end)
-{
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0])).Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0])).Write(p3begin == p3end ? pblank : (const unsigned char*)&p3begin[0], (p3end - p3begin) * sizeof(p3begin[0])).Finalize((unsigned char*)&result);
-    return result;
-}
-
-/** Compute the 256-bit hash of the concatenation of three objects. */
-template <typename T1, typename T2, typename T3, typename T4>
-inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2 p2end, const T3 p3begin, const T3 p3end, const T4 p4begin, const T4 p4end)
-{
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0])).Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0])).Write(p3begin == p3end ? pblank : (const unsigned char*)&p3begin[0], (p3end - p3begin) * sizeof(p3begin[0])).Write(p4begin == p4end ? pblank : (const unsigned char*)&p4begin[0], (p4end - p4begin) * sizeof(p4begin[0])).Finalize((unsigned char*)&result);
-    return result;
-}
-
-/** Compute the 256-bit hash of the concatenation of three objects. */
-template <typename T1, typename T2, typename T3, typename T4, typename T5>
-inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2 p2end, const T3 p3begin, const T3 p3end, const T4 p4begin, const T4 p4end, const T5 p5begin, const T5 p5end)
-{
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0])).Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0])).Write(p3begin == p3end ? pblank : (const unsigned char*)&p3begin[0], (p3end - p3begin) * sizeof(p3begin[0])).Write(p4begin == p4end ? pblank : (const unsigned char*)&p4begin[0], (p4end - p4begin) * sizeof(p4begin[0])).Write(p5begin == p5end ? pblank : (const unsigned char*)&p5begin[0], (p5end - p5begin) * sizeof(p5begin[0])).Finalize((unsigned char*)&result);
-    return result;
-}
-
-/** Compute the 256-bit hash of the concatenation of three objects. */
-template <typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-inline uint256 Hash(const T1 p1begin, const T1 p1end, const T2 p2begin, const T2 p2end, const T3 p3begin, const T3 p3end, const T4 p4begin, const T4 p4end, const T5 p5begin, const T5 p5end, const T6 p6begin, const T6 p6end)
-{
-    static const unsigned char pblank[1] = {};
-    uint256 result;
-    CHash256().Write(p1begin == p1end ? pblank : (const unsigned char*)&p1begin[0], (p1end - p1begin) * sizeof(p1begin[0])).Write(p2begin == p2end ? pblank : (const unsigned char*)&p2begin[0], (p2end - p2begin) * sizeof(p2begin[0])).Write(p3begin == p3end ? pblank : (const unsigned char*)&p3begin[0], (p3end - p3begin) * sizeof(p3begin[0])).Write(p4begin == p4end ? pblank : (const unsigned char*)&p4begin[0], (p4end - p4begin) * sizeof(p4begin[0])).Write(p5begin == p5end ? pblank : (const unsigned char*)&p5begin[0], (p5end - p5begin) * sizeof(p5begin[0])).Write(p6begin == p6end ? pblank : (const unsigned char*)&p6begin[0], (p6end - p6begin) * sizeof(p6begin[0])).Finalize((unsigned char*)&result);
     return result;
 }
 
@@ -340,7 +276,7 @@ public:
     }
 
     template<typename T>
-    CHashVerifier<Source>& operator>>(T& obj)
+    CHashVerifier<Source>& operator>>(T&& obj)
     {
         // Unserialize from this stream
         ::Unserialize(*this, obj);
@@ -370,9 +306,9 @@ public:
     CBLAKE2bWriter(int nTypeIn, int nVersionIn, const unsigned char* personal) : nType(nTypeIn), nVersion(nVersionIn) {
         assert(crypto_generichash_blake2b_init_salt_personal(
             &state,
-            NULL, 0, // No key.
+            nullptr, 0, // No key.
             32,
-            NULL,    // No salt.
+            nullptr,    // No salt.
             personal) == 0);
     }
 
@@ -417,10 +353,10 @@ inline uint256 HashQuark(const T1 pbegin, const T1 pend)
     sph_skein512_context ctx_skein;
     static unsigned char pblank[1];
 
-    uint512 mask = 8;
-    uint512 zero = 0;
+    arith_uint512 mask(8);
+    arith_uint512 zero(0);
 
-    uint512 hash[9];
+    arith_uint512 hash[9];
 
     sph_blake512_init(&ctx_blake);
     // ZBLAKE;
@@ -491,43 +427,6 @@ inline uint256 HashQuark(const T1 pbegin, const T1 pend)
 }
 
 void scrypt_hash(const char* pass, unsigned int pLen, const char* salt, unsigned int sLen, char* output, unsigned int N, unsigned int r, unsigned int p, unsigned int dkLen);
-
-
-/** SipHash-2-4 */
-class CSipHasher
-{
-private:
-    uint64_t v[4];
-    uint64_t tmp;
-    int count;
-
-public:
-    /** Construct a SipHash calculator initialized with 128-bit key (k0, k1) */
-    CSipHasher(uint64_t k0, uint64_t k1);
-    /** Hash a 64-bit integer worth of data
-     *  It is treated as if this was the little-endian interpretation of 8 bytes.
-     *  This function can only be used when a multiple of 8 bytes have been written so far.
-     */
-    CSipHasher& Write(uint64_t data);
-    /** Hash arbitrary bytes. */
-    CSipHasher& Write(const unsigned char* data, size_t size);
-    /** Compute the 64-bit SipHash-2-4 of the data written so far. The object remains untouched. */
-    uint64_t Finalize() const;
-};
-
-
-/** Optimized SipHash-2-4 implementation for uint256.
- *
- *  It is identical to:
- *    SipHasher(k0, k1)
- *      .Write(val.GetUint64(0))
- *      .Write(val.GetUint64(1))
- *      .Write(val.GetUint64(2))
- *      .Write(val.GetUint64(3))
- *      .Finalize()
- */
-uint64_t SipHashUint256(uint64_t k0, uint64_t k1, const uint256& val);
-uint64_t SipHashUint256Extra(uint64_t k0, uint64_t k1, const uint256& val, uint32_t extra);
 
 #endif // SPECTRESECURITY_HASH_H
 

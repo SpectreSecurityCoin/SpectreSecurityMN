@@ -1,13 +1,14 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2020 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef SENDCHANGEADDRESSDIALOG_H
 #define SENDCHANGEADDRESSDIALOG_H
 
-#include "script/standard.h"
+#include "destination_io.h"
 #include "qt/spectresecurity/focuseddialog.h"
 #include "qt/spectresecurity/snackbar.h"
+#include "script/standard.h"
 
 class WalletModel;
 
@@ -20,19 +21,20 @@ class SendChangeAddressDialog : public FocusedDialog
     Q_OBJECT
 
 public:
-    explicit SendChangeAddressDialog(QWidget* parent, WalletModel* model);
+    explicit SendChangeAddressDialog(QWidget* parent, WalletModel* model, bool isTransparent);
     ~SendChangeAddressDialog();
 
     void setAddress(QString address);
-    CTxDestination getDestination() const;
+    CWDestination getDestination() const;
 
     void showEvent(QShowEvent* event) override;
 
 private:
+    bool isTransparent;
     WalletModel* walletModel;
     Ui::SendChangeAddressDialog *ui;
     SnackBar *snackBar = nullptr;
-    CTxDestination dest;
+    CWDestination dest;
 
     void inform(const QString& text);
 

@@ -18,6 +18,7 @@ import argparse
 from collections import deque
 import configparser
 import datetime
+import logging
 import os
 import time
 import shutil
@@ -26,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 import re
-import logging
+
 
 # Formatting. Default colors to empty strings.
 BOLD, BLUE, RED, GREY = ("", ""), ("", ""), ("", ""), ("", "")
@@ -58,48 +59,77 @@ BASE_SCRIPTS= [
     # Longest test should go first, to favor running tests in parallel
     'wallet_basic.py',                          # ~ 498 sec
     'wallet_backup.py',                         # ~ 477 sec
+    'mempool_persist.py',                       # ~ 417 sec
+    'p2p_quorum_connect.py',                    # ~ 400 sec
+    'wallet_reorgsrestore.py',                  # ~ 391 sec
+    'p2p_addr_relay.py',                        # ~ 380 sec
 
     # vv Tests less than 5m vv
+    'wallet_hd.py',                             # ~ 300 sec
     'wallet_zapwallettxes.py',                  # ~ 300 sec
-    'wallet_hd.py',                             # ~ 280 sec
+    'feature_asmap.py',                         # ~ 271 sec
     'p2p_time_offset.py',                       # ~ 267 sec
-    'rpc_fundrawtransaction.py',                # ~ 260 sec
-    'mining_pos_coldStaking.py',                # ~ 215 sec
-    'wallet_abandonconflict.py',                # ~ 212 sec
-    'feature_logging.py',                       # ~ 200 sec
-    'rpc_rawtransaction.py',                    # ~ 193 sec
-    'wallet_keypool_topup.py',                  # ~ 174 sec
-    'wallet_txn_doublespend.py --mineblock',    # ~ 157 sec
-    'wallet_txn_clone.py --mineblock',          # ~ 157 sec
-    'rpc_spork.py',                             # ~ 156 sec
-    'interface_rest.py',                        # ~ 154 sec
-    'feature_proxy.py',                         # ~ 143 sec
-    'feature_uacomment.py',                     # ~ 130 sec
+    'rpc_fundrawtransaction.py',                # ~ 227 sec
+    'mining_pos_coldStaking.py',                # ~ 220 sec
+    'wallet_import_rescan.py',                  # ~ 204 sec
+    'p2p_invalid_block.py',                     # ~ 213 sec
+    'feature_reindex.py',                       # ~ 205 sec
+    'rpc_scantxoutset.py',
+    'feature_logging.py',                       # ~ 195 sec
+    'wallet_multiwallet.py',                    # ~ 190 sec
+    'rpc_bind.py --ipv6',                       # ~ 191 sec
+    'wallet_abandonconflict.py',                # ~ 188 sec
+    'feature_blockindexstats.py',               # ~ 167 sec
+    'wallet_importmulti.py',                    # ~ 157 sec
+    'wallet_keypool_topup.py',                  # ~ 153 sec
+    'rpc_bind.py --ipv4',                       # ~ 151 sec
+    'rpc_spork.py',                             # ~ 144 sec
+    'wallet_txn_doublespend.py --mineblock',    # ~ 143 sec
+    'wallet_txn_clone.py --mineblock',          # ~ 143 sec
+    'feature_block.py',                         # ~ 140 sec
+    'feature_proxy.py',                         # ~ 138 sec
+    'rpc_rawtransaction.py',                    # ~ 134 sec
+    'p2p_invalid_messages.py',                  # ~ 132 sec
     'mining_pos_reorg.py',                      # ~ 128 sec
-    'wallet_upgrade.py',                        # ~ 124 sec
-    'wallet_import_stakingaddress.py',          # ~ 123 sec
+    'rpc_bind.py --nonloopback',                # ~ 126 sec
+    'feature_uacomment.py',                     # ~ 125 sec
+    'interface_rest.py',                        # ~ 120 sec
 
     # vv Tests less than 2m vv
+    'wallet_upgrade.py',                        # ~ 119 sec
     'p2p_disconnect_ban.py',                    # ~ 118 sec
-    'wallet_listreceivedby.py',                 # ~ 117 sec
-    'mining_pos_fakestake.py',                  # ~ 113 sec
-    'feature_reindex.py',                       # ~ 110 sec
+    'feature_notifications.py',                 # ~ 115 sec
+    'rpc_invalidateblock.py',                   # ~ 107 sec
     'interface_http.py',                        # ~ 105 sec
+    'feature_abortnode.py',                     # ~ 101 sec
     'feature_blockhashcache.py',                # ~ 100 sec
+    'p2p_invalid_tx.py',                        # ~ 98 sec
     'wallet_listtransactions.py',               # ~ 97 sec
+    'wallet_listreceivedby.py',                 # ~ 94 sec
+    'mining_pos_fakestake.py',                  # ~ 94 sec
     'mempool_reorg.py',                         # ~ 92 sec
+    'interface_zmq.py',                         # ~ 90 sec
     'wallet_encryption.py',                     # ~ 89 sec
+    'wallet_import_stakingaddress.py',          # ~ 88 sec
     'wallet_keypool.py',                        # ~ 88 sec
+    'feature_blocksdir.py',                     # ~ 85 sec
+    'feature_config_args.py',                   # ~ 85 sec
     'wallet_dump.py',                           # ~ 83 sec
     'rpc_net.py',                               # ~ 83 sec
     'rpc_bip38.py',                             # ~ 82 sec
-    #'rpc_deprecated.py',                        # ~ 80 sec (disabled for now, no deprecated RPC commands to test)
+    'rpc_deprecated.py',                        # ~ 80 sec
     'interface_bitcoin_cli.py',                 # ~ 80 sec
+    'feature_filelock.py',                      # ~ 71 sec
     'mempool_packages.py',                      # ~ 63 sec
+    'sapling_wallet_encryption.py',
+    'feature_exchangeaddr.py',
 
     # vv Tests less than 60s vv
+    'rpc_users.py',
     'wallet_labels.py',                         # ~ 57 sec
     'rpc_signmessage.py',                       # ~ 54 sec
+    'p2p_leak.py',                              # ~ 54 sec
+    'wallet_resendwallettransactions.py',       # ~ 53 sec
     'mempool_resurrect.py',                     # ~ 51 sec
     'rpc_budget.py',                            # ~ 50 sec
     'mempool_spend_coinbase.py',                # ~ 50 sec
@@ -107,40 +137,42 @@ BASE_SCRIPTS= [
     'rpc_decodescript.py',                      # ~ 50 sec
     'rpc_blockchain.py',                        # ~ 50 sec
     'wallet_disable.py',                        # ~ 50 sec
+    'p2p_addrv2_relay.py',                      # ~ 49 sec
+    'wallet_autocombine.py',                    # ~ 49 sec
     'mining_v5_upgrade.py',                     # ~ 48 sec
+    'p2p_timeouts.py',
+    'p2p_mempool.py',                           # ~ 46 sec
+    'rpc_named_arguments.py',                   # ~ 45 sec
     'feature_help.py',                          # ~ 30 sec
 
     # Don't append tests at the end to avoid merge conflicts
     # Put them in a random line within the section that fits their approximate run-time
-    # 'feature_block.py',
-    # 'wallet_importmulti.py',
     # 'mempool_limit.py', # We currently don't limit our mempool_reorg
-    # 'interface_zmq.py',
     # 'rpc_getchaintips.py',
-    # 'mempool_persist.py',
-    # 'rpc_users.py',
-    # 'p2p_mempool.py',
     # 'mining_prioritisetransaction.py',
-    # 'p2p_invalid_block.py',
-    # 'p2p_invalid_tx.py',
-    # 'wallet_import_rescan.py',
     # 'mining_basic.py',
     # 'wallet_bumpfee.py',
     # 'wallet_listsinceblock.py',
-    # 'p2p_leak.py',
     # 'feature_cltv.py',
     # 'feature_minchainwork.py',
     # 'p2p_fingerprint.py',
     # 'p2p_unrequested_blocks.py',
-    # 'feature_config_args.py',
-
 ]
 
 TIERTWO_SCRIPTS = [
     # Longest test should go first, to favor running tests in parallel
-    'tiertwo_governance_sync_basic.py',
-    'tiertwo_masternode_activation.py',
-    'tiertwo_masternode_ping.py',
+    'tiertwo_governance_sync_basic.py',         # ~ 1160 sec
+    'tiertwo_dkg_errors.py',                    # ~ 486 sec
+    'tiertwo_dkg_pose.py',                      # ~ 444 sec
+    'tiertwo_mn_compatibility.py',              # ~ 413 sec
+    'tiertwo_signing_session.py',               # ~ 390 sec
+    'tiertwo_chainlocks.py',                    # ~ ??? sec
+    'tiertwo_deterministicmns.py',              # ~ 366 sec
+    'tiertwo_governance_reorg.py',              # ~ 361 sec
+    'tiertwo_masternode_activation.py',         # ~ 352 sec
+    'tiertwo_masternode_ping.py',               # ~ 293 sec
+    'tiertwo_governance_invalid_budget.py',     # ~ 266 sec
+    'tiertwo_reorg_mempool.py',                 # ~ 97 sec
 ]
 
 SAPLING_SCRIPTS = [
@@ -150,9 +182,10 @@ SAPLING_SCRIPTS = [
     'sapling_wallet_anchorfork.py',             # ~ 345 sec
     'sapling_wallet_nullifiers.py',             # ~ 190 sec
     'sapling_wallet_listreceived.py',           # ~ 157 sec
-    'sapling_changeaddresses.py',               # ~ 151 sec
+    'sapling_wallet_send.py',                   # ~ 126 sec
     'sapling_mempool.py',                       # ~ 98 sec
     'sapling_wallet_persistence.py',            # ~ 90 sec
+    'sapling_changeaddresses.py',               # ~ 66 sec
     'sapling_supply.py',                        # ~ 58 sec
     'sapling_malleable_sigs.py',                # ~ 44 sec
 ]
@@ -161,22 +194,22 @@ EXTENDED_SCRIPTS = [
     # These tests are not run by the travis build process.
     # Longest test should go first, to favor running tests in parallel
     # vv Tests less than 20m vv
+    'feature_dbcrash.py',
     'sapling_fillblock.py',                     # ~ 780 sec
     'feature_fee_estimation.py',                # ~ 360 sec
     # vv Tests less than 5m vv
     # vv Tests less than 2m vv
-    #'p2p_timeouts.py',
     # vv Tests less than 60s vv
     #'p2p_feefilter.py',
-    'rpc_bind.py',
     # vv Tests less than 30s vv
     #'example_test.py',
-    'feature_notifications.py',
-    'rpc_invalidateblock.py',
 ]
 
 LEGACY_SKIP_TESTS = [
     # These tests are not run when the flag --legacywallet is used
+    'feature_block.py',
+    'feature_blockindexstats.py',
+    'feature_config_args.py',
     'feature_help.py',
     'feature_logging.py',
     'feature_reindex.py',
@@ -198,9 +231,12 @@ LEGACY_SKIP_TESTS = [
     'rpc_net.py',
     'rpc_signmessage.py',
     'rpc_spork.py',
+    'rpc_users.py',
     'wallet_hd.py',         # no HD tests for pre-HD wallets
     'wallet_upgrade.py',    # can't upgrade to pre-HD wallet
+    'sapling_supply.py',
     'sapling_wallet_persistence.py',
+    'sapling_wallet_send.py',
     'sapling_wallet.py',
     'sapling_changeaddresses.py',
     'sapling_key_import_export.py',
@@ -208,10 +244,14 @@ LEGACY_SKIP_TESTS = [
     'sapling_wallet_listreceived.py',
     'sapling_wallet_nullifiers.py',
     'sapling_mempool.py',
+    'wallet_importmulti.py',
+    'wallet_import_rescan.py',
+    'wallet_multiwallet.py',
+    'sapling_wallet_encryption.py'
 ]
 
-# Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
-ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS + TIERTWO_SCRIPTS + SAPLING_SCRIPTS
+# Place the lists with the longest tests (on average) first
+ALL_SCRIPTS = EXTENDED_SCRIPTS + TIERTWO_SCRIPTS + SAPLING_SCRIPTS + BASE_SCRIPTS
 
 NON_SCRIPTS = [
     # These are python files that live in the functional tests directory, but are not test scripts.
@@ -274,7 +314,7 @@ def main():
 
     enable_wallet = config["components"].getboolean("ENABLE_WALLET")
     enable_utils = config["components"].getboolean("ENABLE_UTILS")
-    enable_bitcoind = config["components"].getboolean("ENABLE_BITCOIND")
+    enable_spectresecurityd = config["components"].getboolean("ENABLE_BITCOIND")
 
     if config["environment"]["EXEEXT"] == ".exe" and not args.force:
         # https://github.com/bitcoin/bitcoin/commit/d52802551752140cf41f0d9a225a43e84404d3e9
@@ -282,7 +322,7 @@ def main():
         print("Tests currently disabled on Windows by default. Use --force option to enable")
         sys.exit(0)
 
-    if not (enable_wallet and enable_utils and enable_bitcoind):
+    if not (enable_wallet and enable_utils and enable_spectresecurityd):
         print("No functional tests to run. Wallet, utils, and spectresecurityd must all be enabled")
         print("Rerun `configure` with -enable-wallet, -with-utils and -with-daemon and rerun make")
         sys.exit(0)
@@ -294,7 +334,7 @@ def main():
         if tests:
             # Individual tests have been specified. Run specified tests that exist
             # in the ALL_SCRIPTS list. Accept the name with or without .py extension.
-            tests = [re.sub("\.py$", "", t) + ".py" for t in tests]
+            tests = [re.sub(r"\.py$", "", t) + ".py" for t in tests]
             test_list = []
             for t in tests:
                 if t in ALL_SCRIPTS:
@@ -310,7 +350,7 @@ def main():
             if len(test_list) == 0:
                 # No individual tests (or sub-list) have been specified.
                 # Run all base tests, and optionally run extended tests.
-                test_list = BASE_SCRIPTS
+                test_list = TIERTWO_SCRIPTS + SAPLING_SCRIPTS + BASE_SCRIPTS
                 if args.extended:
                     # place the EXTENDED_SCRIPTS first since the three longest ones
                     # are there and the list is shorter
@@ -318,7 +358,7 @@ def main():
 
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:
-        tests_excl = [re.sub("\.py$", "", t) + ".py" for t in args.exclude.split(',')]
+        tests_excl = [re.sub(r"\.py$", "", t) + ".py" for t in args.exclude.split(',')]
         for exclude_test in tests_excl:
             if exclude_test in test_list:
                 test_list.remove(exclude_test)
@@ -359,8 +399,10 @@ def main():
 # - "rewrite" : (default) Delete cache directory and recreate it.
 # - "keep"    : Check if the cache in the directory is valid. Recreate only if invalid.
 # - "skip"    : Don' check the contents of the cache and don't create a new one
-def run_tests(test_list, src_dir, build_dir, exeext, tmpdir, jobs=1, enable_coverage=False, args=[], combined_logs_len=0, keep_cache="rewrite"):
+def run_tests(test_list, src_dir, build_dir, exeext, tmpdir, jobs=1, enable_coverage=False, args=None, combined_logs_len=0, keep_cache="rewrite"):
     # Warn if spectresecurityd is already running (unix only)
+    if args is None:
+        args = []
     try:
         if subprocess.check_output(["pidof", "spectresecurityd"]) is not None:
             print("%sWARNING!%s There is already a spectresecurityd process running on this system. Tests may fail unexpectedly due to resource contention!" % (BOLD[1], BOLD[0]))
@@ -486,7 +528,7 @@ class TestHandler:
     """
 
     def __init__(self, num_tests_parallel, tests_dir, tmpdir, test_list=None, flags=None):
-        assert(num_tests_parallel >= 1)
+        assert num_tests_parallel >= 1
         self.num_jobs = num_tests_parallel
         self.tests_dir = tests_dir
         self.tmpdir = tmpdir
@@ -665,7 +707,7 @@ class RPCCoverage():
         if not os.path.isfile(coverage_ref_filename):
             raise RuntimeError("No coverage reference found")
 
-        with open(coverage_ref_filename, 'r') as f:
+        with open(coverage_ref_filename, 'r', encoding="utf8") as f:
             all_cmds.update([i.strip() for i in f.readlines()])
 
         for root, dirs, files in os.walk(self.dir):
@@ -674,7 +716,7 @@ class RPCCoverage():
                     coverage_filenames.add(os.path.join(root, filename))
 
         for filename in coverage_filenames:
-            with open(filename, 'r') as f:
+            with open(filename, 'r', encoding="utf8") as f:
                 covered_cmds.update([i.strip() for i in f.readlines()])
 
         return all_cmds - covered_cmds

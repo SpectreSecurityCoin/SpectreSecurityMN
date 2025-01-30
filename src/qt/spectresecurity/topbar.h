@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2021 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,6 +6,7 @@
 #define TOPBAR_H
 
 #include <QWidget>
+#include "qt/askpassphrasedialog.h"
 #include "qt/spectresecurity/pwidget.h"
 #include "qt/spectresecurity/lockunlock.h"
 #include "amount.h"
@@ -48,14 +49,16 @@ public Q_SLOTS:
 
     void setNumConnections(int count);
     void setNumBlocks(int count);
+    void setNetworkActive(bool active);
     void setStakingStatusActive(bool fActive);
     void updateStakingStatus();
-    void updateHDState(const bool& upgraded, const QString& upgradeError);
+    void updateHDState(const bool upgraded, const QString& upgradeError);
     void showUpgradeDialog(const QString& message);
 
 Q_SIGNALS:
     void themeChanged(bool isLight);
     void walletSynced(bool isSync);
+    void tierTwoSynced(bool isSync);
     void onShowHideColdStakingChanged(bool show);
 
 protected:

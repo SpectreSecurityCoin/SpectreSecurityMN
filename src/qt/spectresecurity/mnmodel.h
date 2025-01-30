@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The SPECTRESECURITY developers
+// Copyright (c) 2019-2022 The SPECTRESECURITY Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,19 +6,23 @@
 #define MNMODEL_H
 
 #include <QAbstractTableModel>
-#include "masternode.h"
 #include "masternodeconfig.h"
+#include "qt/walletmodel.h"
+
+class CMasternode;
 
 class MNModel : public QAbstractTableModel
 {
     Q_OBJECT
 
 public:
-    explicit MNModel(QObject *parent = nullptr);
+    explicit MNModel(QObject *parent);
     ~MNModel() override {
         nodes.clear();
         collateralTxAccepted.clear();
     }
+    void init();
+    void setWalletModel(WalletModel* _model) { walletModel = _model; };
 
     enum ColumnIndex {
         ALIAS = 0,  /**< User specified MN alias */
@@ -44,18 +48,41 @@ public:
 
     bool isMNsNetworkSynced();
     // Returns the MN activeState field.
-    int getMNState(QString alias);
+    int getMNState(const QString& mnAlias);
     // Checks if the masternode is inactive
-    bool isMNInactive(QString mnAlias);
+    bool isMNInactive(const QString& mnAlias);
     // Masternode is active if it's in PRE_ENABLED OR ENABLED state
-    bool isMNActive(QString mnAlias);
+    bool isMNActive(const QString& mnAlias);
     // Masternode collateral has enough confirmations
-    bool isMNCollateralMature(QString mnAlias);
+    bool isMNCollateralMature(const QString& mnAlias);
     // Validate string representing a masternode IP address
     static bool validateMNIP(const QString& addrStr);
 
+    // Return the specific chain amount value for the MN collateral output.
+    CAmount getMNCollateralRequiredAmount();
+    // Return the specific chain min conf for the collateral tx
+    int getMasternodeCollateralMinConf();
+    // Generates the collateral transaction
+    bool createMNCollateral(const QString& alias, const QString& addr, COutPoint& ret_outpoint, QString& ret_error);
+    // Creates the mnb and broadcast it to the network
+    bool startLegacyMN(const CMasternodeConfig::CMasternodeEntry& mne, int chainHeight, std::string& strError);
+    void startAllLegacyMNs(bool onlyMissing, int& amountOfMnFailed, int& amountOfMnStarted,
+                           std::string* aliasFilter = nullptr, std::string* error_ret = nullptr);
+
+    CMasternodeConfig::CMasternodeEntry* createLegacyMN(COutPoint& collateralOut,
+                                                        const std::string& alias,
+                                                        std::string& serviceAddr,
+                                                        const std::string& port,
+                                                        const std::string& mnKeyString,
+                                                        QString& ret_error);
+
+    bool removeLegacyMN(const std::string& alias_to_remove, const std::string& tx_id, unsigned int out_index, QString& ret_error);
+    void setCoinControl(CCoinControl* coinControl);
+    void resetCoinControl();
 
 private:
+    WalletModel* walletModel;
+    CCoinControl* coinControl;
     // alias mn node ---> pair <ip, master node>
     QMap<QString, std::pair<QString, CMasternode*>> nodes;
     QMap<std::string, bool> collateralTxAccepted;

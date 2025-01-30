@@ -2,12 +2,6 @@ Contents
 ========
 This directory contains tools for developers working on this repository.
 
-check-doc.py
-============
-
-Check if all command line args are documented. The return value indicates the
-number of undocumented args.
-
 clang-format-diff.py
 ===================
 
@@ -44,31 +38,31 @@ Specifying `verbose` will list the full filenames of files of each category.
 
 copyright\_header.py update \<base\_directory\> [verbose]
 ---------------------------------------------------------
-Updates all the copyright headers of `The SPECTRESECURITY developers` which were
+Updates all the copyright headers of `The SPECTRESECURITY Core developers` which were
 changed in a year more recent than is listed. For example:
 ```
-// Copyright (c) <firstYear>-<lastYear> The SPECTRESECURITY developers
+// Copyright (c) <firstYear>-<lastYear> The SPECTRESECURITY Core developers
 ```
 will be updated to:
 ```
-// Copyright (c) <firstYear>-<lastModifiedYear> The SPECTRESECURITY developers
+// Copyright (c) <firstYear>-<lastModifiedYear> The SPECTRESECURITY Core developers
 ```
 where `<lastModifiedYear>` is obtained from the `git log` history.
 
 This subcommand also handles copyright headers that have only a single year. In
 those cases:
 ```
-// Copyright (c) <year> The SPECTRESECURITY developers
+// Copyright (c) <year> The SPECTRESECURITY Core developers
 ```
 will be updated to:
 ```
-// Copyright (c) <year>-<lastModifiedYear> The SPECTRESECURITY developers
+// Copyright (c) <year>-<lastModifiedYear> The SPECTRESECURITY Core developers
 ```
 where the update is appropriate.
 
 copyright\_header.py insert \<file\>
 ------------------------------------
-Inserts a copyright header for `The SPECTRESECURITY developers` at the top of the
+Inserts a copyright header for `The SPECTRESECURITY Core developers` at the top of the
 file in either Python or C++ style as determined by the file extension. If the
 file is a Python file and it has  `#!` starting the first line, the header is
 inserted in the line below it.
@@ -78,7 +72,7 @@ The copyright dates will be set to be `<year_introduced>-<current_year>` where
 `<year_introduced>` is equal to `<current_year>`, it will be set as a single
 year rather than two hyphenated years.
 
-If the file already has a copyright for `The SPECTRESECURITY developers`, the
+If the file already has a copyright for `The SPECTRESECURITY Core developers`, the
 script will exit.
 
 gen-manpages.sh
@@ -150,7 +144,7 @@ Then do:
 Create and verify timestamps of merge commits
 ---------------------------------------------
 To create or verify timestamps on the merge commits, install the OpenTimestamps
-client via `pip3 install opentimestamps-client`. Then, dowload the gpg wrapper
+client via `pip3 install opentimestamps-client`. Then, download the gpg wrapper
 `ots-git-gpg-wrapper.sh` and set it as git's `gpg.program`. See
 [the ots git integration documentation](https://github.com/opentimestamps/opentimestamps-client/blob/master/doc/git-integration.md#usage)
 for further details.
@@ -164,22 +158,26 @@ repository (requires pngcrush).
 security-check.py and test-security-check.py
 ============================================
 
-Perform basic ELF security checks on a series of executables.
+Perform basic security checks on a series of executables.
 
 symbol-check.py
 ===============
 
-A script to check that the (Linux) executables produced by gitian only contain
-allowed gcc, glibc and libstdc++ version symbols. This makes sure they are
-still compatible with the minimum supported Linux distribution versions.
+A script to check that the executables produced by gitian only contain
+certain symbols and are only linked against allowed libraries.
+
+For Linux this means checking for allowed gcc, glibc and libstdc++ version symbols.
+This makes sure they are still compatible with the minimum supported distribution versions.
+
+For macOS and Windows we check that the executables are only linked against libraries we allow.
 
 Example usage after a gitian build:
 
     find ../gitian-builder/build -type f -executable | xargs python3 contrib/devtools/symbol-check.py
 
-If only supported symbols are used the return value will be 0 and the output will be empty.
+If no errors occur the return value will be 0 and the output will be empty.
 
-If there are 'unsupported' symbols, the return value will be 1 a list like this will be printed:
+If there are any errors the return value will be 1 and output like this will be printed:
 
     .../64/test_spectresecurity: symbol memcpy from unsupported version GLIBC_2.14
     .../64/test_spectresecurity: symbol __fdelt_chk from unsupported version GLIBC_2.15

@@ -9,7 +9,7 @@
 * @copyright  Copyright 2013 Ian Miers, Christina Garman and Matthew Green
 * @license    This project is released under the MIT license.
 **/
-// Copyright (c) 2017-2019 The SPECTRESECURITY developers
+// Copyright (c) 2017-2021 The SPECTRESECURITY Core developers
 
 #ifndef PARAMS_H_
 #define PARAMS_H_
@@ -56,14 +56,7 @@ public:
 	 */
 	CBigNum groupOrder;
 
-	ADD_SERIALIZE_METHODS;
-  template <typename Stream, typename Operation>  inline void SerializationOp(Stream& s, Operation ser_action) {
-		    READWRITE(initialized);
-		    READWRITE(g);
-		    READWRITE(h);
-		    READWRITE(modulus);
-		    READWRITE(groupOrder);
-	}	
+    SERIALIZE_METHODS(IntegerGroupParams, obj) { READWRITE(obj.initialized, obj.g , obj.h, obj.modulus, obj.groupOrder); }
 };
 
 class AccumulatorAndProofParams {
@@ -98,7 +91,7 @@ public:
 
 	/**
 	 * The initial value for the accumulator
-	 * A random Quadratic residue mod n thats not 1
+         * A random Quadratic residue mod n that's not 1
 	 */
 	CBigNum accumulatorBase;
 
@@ -109,7 +102,7 @@ public:
 	CBigNum minCoinValue;
 
 	/**
-	 * Upper bound on the value for a comitted coin.
+         * Upper bound on the value for a committed coin.
 	 * Required by the accumulator proof.
 	 */
 	CBigNum maxCoinValue;
@@ -134,23 +127,15 @@ public:
 	 */
 	uint32_t k_prime;
 
-	/**
-	 * Security parameter.
-	 * The statistical zero-knowledgeness of the accumulator proof.
-	 */
-	uint32_t k_dprime;
-	ADD_SERIALIZE_METHODS;
-  template <typename Stream, typename Operation>  inline void SerializationOp(Stream& s, Operation ser_action) {
-	    READWRITE(initialized);
-	    READWRITE(accumulatorModulus);
-	    READWRITE(accumulatorBase);
-	    READWRITE(accumulatorPoKCommitmentGroup);
-	    READWRITE(accumulatorQRNCommitmentGroup);
-	    READWRITE(minCoinValue);
-	    READWRITE(maxCoinValue);
-	    READWRITE(k_prime);
-	    READWRITE(k_dprime);
-  }
+    /**
+     * Security parameter.
+     * The statistical zero-knowledgeness of the accumulator proof.
+     */
+    uint32_t k_dprime;
+    SERIALIZE_METHODS(AccumulatorAndProofParams, obj) {
+        READWRITE(obj.initialized, obj.accumulatorModulus, obj.accumulatorBase, obj.accumulatorPoKCommitmentGroup);
+        READWRITE(obj.accumulatorQRNCommitmentGroup, obj.minCoinValue, obj.maxCoinValue, obj.k_prime, obj.k_dprime);
+    }
 };
 
 class ZerocoinParams {
@@ -203,16 +188,10 @@ public:
 	 * proofs.
 	 */
 	uint32_t zkp_hash_len;
-	
-	ADD_SERIALIZE_METHODS;
-  template <typename Stream, typename Operation>  inline void SerializationOp(Stream& s, Operation ser_action) {
-	    READWRITE(initialized);
-	    READWRITE(accumulatorParams);
-	    READWRITE(coinCommitmentGroup);
-	    READWRITE(serialNumberSoKCommitmentGroup);
-	    READWRITE(zkp_iterations);
-	    READWRITE(zkp_hash_len);
-	}
+
+    SERIALIZE_METHODS(ZerocoinParams, obj) {
+        READWRITE(obj.initialized, obj.accumulatorParams, obj.coinCommitmentGroup, obj.serialNumberSoKCommitmentGroup, obj.zkp_iterations, obj.zkp_hash_len);
+    }
 };
 
 } /* namespace libzerocoin */
