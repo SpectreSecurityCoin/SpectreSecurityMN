@@ -2133,13 +2133,13 @@ QCheckBox[cssClass="combo-light"] {
 QCheckBox[cssClass="combo-light"]:checked {
     spacing: 5px;
     font-size:18px;
-    color:#707070;
+    color:#707070; /* Very dark gray. https://www.colorhexa.com/707070 */
 }
 
 QCheckBox[cssClass="combo-light"]:hover {
     spacing: 5px;
     font-size:18px;
-    color: #707070;
+    color: #707070; /* Very dark gray. https://www.colorhexa.com/707070 */
 }
 
 QCheckBox[cssClass="combo-light"]::indicator:unchecked:hover {
