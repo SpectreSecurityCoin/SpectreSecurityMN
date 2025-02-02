@@ -302,7 +302,6 @@ public:
         // Note that of those with the service bits flag, most only support a subset of possible options
         vSeeds.emplace_back("seed1.spectresecurity.io", true);     // Primary DNS Seeder from Fuzzbawls
         vSeeds.emplace_back("seed2.spectresecurity.io", true);    // Secondary DNS Seeder from Fuzzbawls
-        vSeeds.emplace_back("dnsseed.liquid369.wtf", true);     // Primary DNS Seeder from Liquid369
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1, 28);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1, 43);

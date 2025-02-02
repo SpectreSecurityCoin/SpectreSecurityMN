@@ -1240,7 +1240,7 @@ QPushButton[cssClass="btn-check-right"]:checked:hover {
     background-color:#000000; /* Black. https://www.colorhexa.com/000000 */
     font-size:18px;
     padding:4px;
-    color: #FFFFFF;
+    color: #FFFFFF; /* White. https://www.colorhexa.com/ffffff */
     border-top-right-radius:2px;
     border-bottom-right-radius:2px;
 }
