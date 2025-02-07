@@ -906,7 +906,7 @@ HH       LISTS ELEMENTS
 HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH*/
 
 *[cssClass="text-list-title-purple"] {
-    color:#000000; /* Black. https://www.colorhexa.com/000000 */
+    color:#ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     font-size:20px;
 }
 
@@ -1183,7 +1183,7 @@ QPushButton[cssClass="btn-check"]:hover {
     background-color:#FFFFFF; /* White. https://www.colorhexa.com/ffffff */
     font-size:18px;
     padding:4px;
-    color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    color: #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     border-radius: 2px;
 }
 
@@ -1192,7 +1192,7 @@ QPushButton[cssClass="btn-check"]:pressed {
     background-color:#1A000000; /* Black. https://www.colorhexa.com/000000 */
     font-size:18px;
     padding:4px;
-    color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    color: #707070;
     border-radius: 2px;
 }
 
@@ -2019,7 +2019,7 @@ QComboBox[cssClass="btn-combo-chart-selected"]:disabled {
     background-color:#000000; /* Black. https://www.colorhexa.com/000000 */
     padding:6px 12px 6px 6px;
     font-size:16px;
-    border:1px solid #000000; /* Black. https://www.colorhexa.com/000000 */
+    border:1px solid #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     color: #FFFFFF; /* White. https://www.colorhexa.com/ffffff */
     text-align: right;
     border-radius: 2px;
@@ -2564,7 +2564,7 @@ QSpinBox[cssClass="btn-spin-box"], QDoubleSpinBox[cssClass="btn-spin-box"] {
     font-size:16px;
     border:1px solid #bababa; /* Gray. https://www.colorhexa.com/bababa */
     color: #000000; /* Black. https://www.colorhexa.com/000000 */
-    selection-background-color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    selection-background-color: #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     selection-color: #FFFFFF; /* White. https://www.colorhexa.com/ffffff */
 }
 
@@ -2743,7 +2743,7 @@ QComboBox QAbstractItemView::item:selected {
     padding:10px 20px;
     font-size:16px;
     margin:0px;
-    color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    color: #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     border-radius:0px;
     border:none;
     outline: 0px;
@@ -2762,7 +2762,7 @@ QComboBox QAbstractItemView::item:selected QPushButton:hover{
 HH       RADIO BUTTON
 HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH*/
 QRadioButton:checked {
-    color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    color: #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     font-size:20px;
 }
 
@@ -2972,8 +2972,8 @@ HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH*/
 }
 
 QDialogButtonBox QPushButton {
-    border:  1px solid #000000; /* Black. https://www.colorhexa.com/000000 */
-    background-color:#000000; /* Black. https://www.colorhexa.com/000000 */
+    border:  1px solid #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
+    background-color:#ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     font-size:18px;
     padding:4px 10px;
     color: #FFFFFF; /* White. https://www.colorhexa.com/ffffff */
@@ -3046,7 +3046,7 @@ QComboBox[cssClass="btn-combo-edit-dialog"] {
     padding:10px 20px 10px 10px;
     font-size:16px;
     border:1px solid #bababa; /* Gray. https://www.colorhexa.com/bababa */
-    color: #000000; /* Black. https://www.colorhexa.com/000000 */
+    color: #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     text-align: right;
 }
 
@@ -3424,7 +3424,7 @@ QComboBox[cssClass="btn-combo-welcome"] {
     background-color:#000000; /* Black. https://www.colorhexa.com/000000 */
     padding:10px 20px 10px 10px;
     font-size:16px;
-    border:1px solid #000000; /* Black. https://www.colorhexa.com/000000 */
+    border:1px solid #ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
     color:#FFFFFF; /* White. https://www.colorhexa.com/ffffff */
 }
 
@@ -3526,7 +3526,7 @@ HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH*/
 
 *[cssClass="btn-list-menu"]:checked{
     font-size:16px;
-    color: #b088ff;
+    color:#ffc40c; /* Bright orange. https://www.colorhexa.com/ffc40c */
 }
 
 

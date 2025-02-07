@@ -159,12 +159,13 @@ static MapCheckpoints mapCheckpoints = {
 	{ 0, uint256S("00000f2fff98e43a6552c632347d5ffbb5474b42a9a5e9bb33ef086b80421a8d")},
 	{ 1000, uint256S("000000a0d8e9e598324d2422df82b9d55b5d49c79e74f29f7c212d9b93fa94f2")},
 	{ 1567, uint256S("ab285fbefcdfe36abb8e10ecbf13b4afc388b64c48276729fe3eccc246ca6cb5")},
+	{ 14001, uint256S("5ddb29d845b02559dbeff0a9c6bfe7a188df884f6338bc7371b5e0d6d5596f79")},
 };
 
 static const CCheckpointData data = {
     &mapCheckpoints,
-    1737696195, // * UNIX timestamp of last checkpoint block
-    1844,    // * total number of transactions between genesis and last checkpoint
+    1738959675, // * UNIX timestamp of last checkpoint block
+    26777,    // * total number of transactions between genesis and last checkpoint
                 //   (the tx=... number in the UpdateTip debug.log lines)
     3000        // * estimated number of transactions per day after checkpoint
 };
@@ -279,15 +280,16 @@ public:
                 uint256S("0x5b2482eca24caf2a46bb22e0545db7b7037282733faa3a42ec20542509999a64");
         consensus.vUpgrades[Consensus::UPGRADE_ZC_V2].hashActivationBlock =
                 uint256S("0x37ea75fe1c9314171cff429a91b25b9f11331076d1c9de50ee4054d61877f8af");
-        consensus.vUpgrades[Consensus::UPGRADE_BIP65].hashActivationBlock =
-                uint256S("0x82629b7a9978f5c7ea3f70a12db92633a7d2e436711500db28b97efd48b1e527");
-        consensus.vUpgrades[Consensus::UPGRADE_ZC_PUBLIC].hashActivationBlock =
+		consensus.vUpgrades[Consensus::UPGRADE_ZC_PUBLIC].hashActivationBlock =
                 uint256S("0xe2448b76d88d37aba4194ffed1041b680d779919157ddf5cbf423373d7f8078e");
+		*/		
+        consensus.vUpgrades[Consensus::UPGRADE_BIP65].hashActivationBlock =
+                uint256S("0x76555036b2bb53631550865c59d7634b17f1930d6a8a0508cf406c52806db97d");
         consensus.vUpgrades[Consensus::UPGRADE_V3_4].hashActivationBlock =
-                uint256S("0x0ef2556e40f3b9f6e02ce611b832e0bbfe7734a8ea751c7b555310ee49b61456");
+                uint256S("0xc3984c3e8437dc2d1a63a6f8094b7c12a589324627b6fc9bef30cec38bd97461");
         consensus.vUpgrades[Consensus::UPGRADE_V4_0].hashActivationBlock =
-                uint256S("0x14e477e597d24549cac5e59d97d32155e6ec2861c1003b42d0566f9bf39b65d5");
-		*/
+                uint256S("0x9e290ea419dc6b735ef18fbea3640199687105f571e60628c9af4888ca6e9038");
+		
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
